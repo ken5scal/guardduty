@@ -3,46 +3,33 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"log"
 	"net/http"
 	"github.com/nlopes/slack"
 	"encoding/json"
 	"bytes"
+	"os"
 )
 
 var ErrNameNotProvided = errors.New("no name was provided in the HTTP body")
 var ErrSlackPostingFailed = errors.New("posting Slack failed")
-var slackURL = "https://hooks.slack.com/services/"
+var slackURL string
 var contentType = "application/json"
+
+func init() {
+	slackURL = os.Getenv("SLACK_URL")
+}
 
 //https://aws.amazon.com/blogs/compute/announcing-go-support-for-aws-lambda/
 func main() {
 	lambda.Start(HandleRequest)
 }
 
-// Handler is your Lambda function handler
-// It uses Amazon API Gateway request/responses provided by the aws-lambda-go/events package,
-// However you could use other event sources (S3, Kinesis etc), or JSON-decoded primitive types such as 'string'.
-func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-
-	// stdout and stderr are sent to AWS CloudWatch Logs
-	log.Printf("Processing Lambda request %s\n", request.RequestContext.RequestID)
-
-	// If no name is provided in the HTTP request body, throw an error
-	if len(request.Body) < 1 {
-		return events.APIGatewayProxyResponse{}, ErrNameNotProvided
+func HandleRequest(request GuardDutyRequest) (string, error) {
+	if slackURL == "" {
+		return "", errors.New("you must set Env Var `SLACK_URL`")
 	}
 
-	return events.APIGatewayProxyResponse{
-		Body:       "Hi " + request.Body,
-		StatusCode: 200,
-	}, nil
-
-}
-
-func HandleRequest(request GuardDutyRequest) (string, error) {
 	if err := postOnSlack(request); err != nil {
 		return "", err
 	}
@@ -51,8 +38,8 @@ func HandleRequest(request GuardDutyRequest) (string, error) {
 
 func postOnSlack(request GuardDutyRequest) error {
 	attachment := slack.Attachment{
-		Color: "danger", //warning, good, pretext
-		Pretext: "'" + request.Detail.Type + "' type found.",
+		Color: "danger", // TODO warning, good, pretext from request.Detail.Severity
+		Pretext: "'" + request.Detail.Type + "' type found.", //TODO Probably add mention if it's danger?
 		Title: request.Detail.Title,
 		Fields: []slack.AttachmentField{
 			{
