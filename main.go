@@ -98,7 +98,7 @@ func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
 	severity := request.Detail.Severity
 	s := &Severity{}
 
-	if alias, ok := accountMap[request.Account]; ok {
+	if alias, ok := accountMap[request.Detail.AccountID]; ok {
 		s.AccountAlias = alias
 	} else {
 		s.AccountAlias = request.Account + ": Alias Not Found"
