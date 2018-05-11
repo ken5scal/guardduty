@@ -7,20 +7,20 @@
   "time": "1970-01-01T00:00:00Z",
   "region": "us-east-1",
   "resources": [],
-  "detail":   {
+  "detail": {
     "schemaVersion": "2.0",
     "accountId": "123456789012",
     "region": "ap-northeast-1",
     "partition": "aws",
-    "id": "36b1830ad38a167ddef0b493c1764246",
-    "arn": "arn:aws:guardduty:ap-northeast-1:123456789012:detector/e6b15a3c39d02cb928758a13a65eb04e/finding/36b1830ad38a167ddef0b493c1764246",
-    "type": "Trojan:EC2/DropPoint!DNS",
+    "id": "02b1830ad38acc893555e58e9ee5617e",
+    "arn": "arn:aws:guardduty:ap-northeast-1:123456789012:detector/e6b15a3c39d02cb928758a13a65eb04e/finding/02b1830ad38acc893555e58e9ee5617e",
+    "type": "UnauthorizedAccess:EC2/RDPBruteForce",
     "resource": {
       "resourceType": "Instance",
       "instanceDetails": {
         "instanceId": "i-99999999",
         "instanceType": "m3.xlarge",
-        "launchTime": "2016-11-12T23:25:58Z",
+        "launchTime": "2016-08-02T02:05:06Z",
         "platform": null,
         "productCodes": [
           {
@@ -104,27 +104,53 @@
       "serviceName": "guardduty",
       "detectorId": "e6b15a3c39d02cb928758a13a65eb04e",
       "action": {
-        "actionType": "DNS_REQUEST",
-        "dnsRequestAction": {
-          "domain": "GeneratedFindingDomainName",
-          "protocol": "UDP",
+        "actionType": "NETWORK_CONNECTION",
+        "networkConnectionAction": {
+          "connectionDirection": "INBOUND",
+          "remoteIpDetails": {
+            "ipAddressV4": "198.51.100.0",
+            "organization": {
+              "asn": "-1",
+              "asnOrg": "GeneratedFindingASNOrg",
+              "isp": "GeneratedFindingISP",
+              "org": "GeneratedFindingORG"
+            },
+            "country": {
+              "countryName": "GeneratedFindingCountryName"
+            },
+            "city": {
+              "cityName": "GeneratedFindingCityName"
+            },
+            "geoLocation": {
+              "lat": 0,
+              "lon": 0
+            }
+          },
+          "remotePortDetails": {
+            "port": 1067,
+            "portName": "Unknown"
+          },
+          "localPortDetails": {
+            "port": 3389,
+            "portName": "RDP"
+          },
+          "protocol": "TCP",
           "blocked": false
         }
       },
       "resourceRole": "TARGET",
       "additionalInfo": {
-        "threatListName": "GeneratedFindingThreatListName",
         "sample": true
       },
-      "eventFirstSeen": "2018-04-27T07:51:12.404Z",
-      "eventLastSeen": "2018-05-11T14:07:26.952Z",
+      "eventFirstSeen": "2018-04-27T07:51:12.405Z",
+      "eventLastSeen": "2018-05-11T14:07:26.954Z",
       "archived": true,
       "count": 37
     },
-    "severity": 5,
-    "createdAt": "2018-04-27T07:51:12.404Z",
-    "updatedAt": "2018-05-11T14:07:26.952Z",
-    "title": "Drop Point domain name queried by EC2 instance i-99999999.",
-    "description": "EC2 instance i-99999999 is querying a domain name of a remote host that is known to hold credentials and other stolen data captured by malware."
+    "severity": 2,
+    "createdAt": "2018-04-27T07:51:12.405Z",
+    "updatedAt": "2018-05-11T14:07:26.954Z",
+    "title": "198.51.100.0 is performing RDP brute force attacks against i-99999999.",
+    "description": "198.51.100.0 is performing RDP brute force attacks against i-99999999. Brute force attacks are used to gain unauthorized access to your instance by guessing the RDP password."
   }
 }
