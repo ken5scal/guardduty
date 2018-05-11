@@ -37,14 +37,19 @@ func HandleRequest(request GuardDutyRequest) (string, error) {
 }
 
 func postOnSlack(request GuardDutyRequest) error {
+	severity, err := mapSeverityToLevel(request)
+	if err != nil {
+		return err
+	}
+
 	attachment := slack.Attachment{
-		Color: "danger", // TODO warning, good, pretext from request.Detail.Severity
-		Pretext: "'" + request.Detail.Type + "' type found.", //TODO Probably add mention if it's danger?
+		Color: severity.Color,
+		Pretext: "'" + severity.Mention + " " + request.Detail.Type + "' type found.",
 		Title: request.Detail.Title,
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Severity",
-				Value: "High",  // TODO Map to High, Medium, Low from request.Detail.Severity
+				Value: severity.Level,
 				Short: true,
 			},
 			{
@@ -74,6 +79,25 @@ func postOnSlack(request GuardDutyRequest) error {
 	}
 
 	return nil
+}
+
+type Severity struct {
+	Level string
+	Color string
+	Mention string
+}
+
+func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
+	severity := request.Detail.Severity
+	if 0 <= severity && severity < 4 {
+		return &Severity{Level:"Low", Color:"#707070"}, nil
+	} else if 4 <= severity && severity < 7 {
+		return &Severity{Level:"Medium", Color:"warning"}, nil
+	} else if severity < 10 {
+		return &Severity{Level:"High", Color:"danger", Mention: "@here"}, nil
+	}
+
+	return nil, errors.New("Severity was not in right range: 0~10.0")
 }
 
 
