@@ -60,7 +60,7 @@ func postOnSlack(request GuardDutyRequest) error {
 			},
 			{
 				Title: "Account",
-				Value: request.Account,  // TODO Map to account names
+				Value: severity.AccountAlias,
 				Short: true,
 			},
 			{
@@ -88,6 +88,7 @@ func postOnSlack(request GuardDutyRequest) error {
 }
 
 type Severity struct {
+	AccountAlias string
 	Level string
 	Color string
 	Announce bool
@@ -95,12 +96,27 @@ type Severity struct {
 
 func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
 	severity := request.Detail.Severity
+	s := &Severity{}
+
+	if alias, ok := accountMap[request.Account]; ok {
+		s.AccountAlias = alias
+	} else {
+		s.AccountAlias = request.Account + ": Alias Not Found"
+	}
+
 	if 0 <= severity && severity < 4 {
-		return &Severity{Level:"Low", Color:"#707070"}, nil
+		s.Level = "Low"
+		s.Color = "#707070"
+		return s, nil
 	} else if 4 <= severity && severity < 7 {
-		return &Severity{Level:"Medium", Color:"warning"}, nil
+		s.Level = "Medium"
+		s.Color = "warning"
+		return s, nil
 	} else if severity < 10 {
-		return &Severity{Level:"High", Color:"danger", Announce: true}, nil
+		s.Level = "High"
+		s.Color = "danger"
+		s.Announce = true
+		return s, nil
 	}
 
 	return nil, errors.New("Severity was not in right range: 0~10.0")
