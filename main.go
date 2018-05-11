@@ -44,7 +44,7 @@ func postOnSlack(request GuardDutyRequest) error {
 
 	attachment := slack.Attachment{
 		Color: severity.Color,
-		Pretext: "'" + severity.Mention + " " + request.Detail.Type + "' type found.",
+		Pretext: severity.Mention+ " '" + request.Detail.Type + "' type found.",
 		Title: request.Detail.Title,
 		Fields: []slack.AttachmentField{
 			{
