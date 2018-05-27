@@ -127,7 +127,7 @@ type GuardDutyRequest struct {
 	Account string `json:"account"`
 	Detail  struct {
 		// Parameters that are important
-		Severity    int         `json:"severity"`
+		Severity    float64     `json:"severity"`
 		Title       string      `json:"title"`
 		Type        string      `json:"type"`
 		UpdatedAt   string      `json:"updatedAt"`
