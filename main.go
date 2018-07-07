@@ -37,19 +37,30 @@ func HandleRequest(request GuardDutyRequest) (string, error) {
 }
 
 func postOnSlack(request GuardDutyRequest) error {
+	severity, err := mapSeverityToLevel(request)
+	if err != nil {
+		return err
+	}
+
+	pretext := "'" + request.Detail.Type + "' type found."
+	if severity.Announce {
+		pretext = "<!here> " + pretext
+	}
+
+
 	attachment := slack.Attachment{
-		Color: "danger", // TODO warning, good, pretext from request.Detail.Severity
-		Pretext: "'" + request.Detail.Type + "' type found.", //TODO Probably add mention if it's danger?
+		Color: severity.Color,
+		Pretext: pretext,
 		Title: request.Detail.Title,
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Severity",
-				Value: "High",  // TODO Map to High, Medium, Low from request.Detail.Severity
+				Value: severity.Level,
 				Short: true,
 			},
 			{
 				Title: "Account",
-				Value: request.Account,  // TODO Map to account names
+				Value: severity.AccountAlias,
 				Short: true,
 			},
 			{
@@ -76,12 +87,47 @@ func postOnSlack(request GuardDutyRequest) error {
 	return nil
 }
 
+type Severity struct {
+	AccountAlias string
+	Level string
+	Color string
+	Announce bool
+}
+
+func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
+	severity := request.Detail.Severity
+	s := &Severity{}
+
+	if alias, ok := accountMap[request.Detail.AccountID]; ok {
+		s.AccountAlias = alias
+	} else {
+		s.AccountAlias = request.Account + ": Alias Not Found"
+	}
+
+	if 0 <= severity && severity < 4 {
+		s.Level = "Low"
+		s.Color = "#707070"
+		return s, nil
+	} else if 4 <= severity && severity < 7 {
+		s.Level = "Medium"
+		s.Color = "warning"
+		return s, nil
+	} else if severity < 10 {
+		s.Level = "High"
+		s.Color = "danger"
+		s.Announce = true
+		return s, nil
+	}
+
+	return nil, errors.New("Severity was not in right range: 0~10.0")
+}
+
 
 type GuardDutyRequest struct {
 	Account string `json:"account"`
 	Detail  struct {
 		// Parameters that are important
-		Severity    int         `json:"severity"`
+		Severity    float64     `json:"severity"`
 		Title       string      `json:"title"`
 		Type        string      `json:"type"`
 		UpdatedAt   string      `json:"updatedAt"`
