@@ -23,6 +23,7 @@ func init() {
 //https://aws.amazon.com/blogs/compute/announcing-go-support-for-aws-lambda/
 func main() {
 	lambda.Start(HandleRequest)
+	fmt.Println("test check")
 }
 
 func HandleRequest(request GuardDutyRequest) (string, error) {
@@ -98,10 +99,15 @@ func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
 	severity := request.Detail.Severity
 	s := &Severity{}
 
-	if alias, ok := accountMap[request.Detail.AccountID]; ok {
-		s.AccountAlias = alias
-	} else {
-		s.AccountAlias = request.Account + ": Alias Not Found"
+	//if alias, ok := accountMap[request.Detail.AccountID]; ok {
+	//	s.AccountAlias = alias
+	//} else {
+	//	s.AccountAlias = request.Account + ": Alias Not Found"
+	//}
+	s.AccountAlias = request.Detail.AccountID
+
+	if request.Detail_type == "Recon:EC2/PortProbeUnprotectedPort" {
+
 	}
 
 	if 0 <= severity && severity < 4 {
@@ -122,6 +128,10 @@ func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
 	return nil, errors.New("Severity was not in right range: 0~10.0")
 }
 
+type ProbeEvents struct {
+	EventLastSeen  string `json:"eventLastSeen"`
+	Count          int    `json:"count"`
+}
 
 type GuardDutyRequest struct {
 	Account string `json:"account"`
@@ -153,6 +163,51 @@ type GuardDutyRequest struct {
 	Source      string        `json:"source"`
 	Time        string        `json:"time"`
 	Version     string        `json:"version"`
+}
+
+type PortProbeAction struct {
+	Action      struct {
+		ActionType      string `json:"actionType"`
+		PortProbeAction struct {
+			PortProbeDetails []struct {
+				LocalPortDetails struct {
+					Port     int    `json:"port"`
+					PortName string `json:"portName"`
+				} `json:"localPortDetails"`
+				RemoteIPDetails struct {
+					Country struct {
+						CountryName string `json:"countryName"`
+					} `json:"country"`
+					City struct {
+						CityName string `json:"cityName"`
+					} `json:"city"`
+					GeoLocation struct {
+						Lon float64 `json:"lon"`
+						Lat float64 `json:"lat"`
+					} `json:"geoLocation"`
+					Organization struct {
+						AsnOrg string `json:"asnOrg"`
+						Org    string `json:"org"`
+						Isp    string `json:"isp"`
+						Asn    string `json:"asn"`
+					} `json:"organization"`
+					IPAddressV4 string `json:"ipAddressV4"`
+				} `json:"remoteIpDetails"`
+			} `json:"portProbeDetails"`
+			Blocked bool `json:"blocked"`
+		} `json:"portProbeAction"`
+	} `json:"action"`
+	AdditionalInfo struct {
+		ThreatListName  string `json:"threatListName"`
+		ThreatName         int    `json:"threatName"`
+	} `json:"additionalInfo"`
+	Archived       bool   `json:"archived"`
+	Count          int    `json:"count"`
+	DetectorID     string `json:"detectorId"`
+	EventFirstSeen string `json:"eventFirstSeen"`
+	EventLastSeen  string `json:"eventLastSeen"`
+	ResourceRole   string `json:"resourceRole"`
+	ServiceName    string `json:"serviceName"`
 }
 
 type NetworkConnectionAction struct {
