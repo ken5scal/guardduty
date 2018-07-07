@@ -107,7 +107,9 @@ func mapSeverityToLevel(request GuardDutyRequest) (*Severity, error) {
 	s.AccountAlias = request.Detail.AccountID
 
 	if request.Detail_type == "Recon:EC2/PortProbeUnprotectedPort" {
+		gd := &GuardDutyRequest{Detail:GuardDutyRequestDetail{Service: PortProbeAction{}}}
 
+		fmt.Println(gd.Detail.Service.(PortProbeAction).Count)
 	}
 
 	if 0 <= severity && severity < 4 {
@@ -135,27 +137,7 @@ type ProbeEvents struct {
 
 type GuardDutyRequest struct {
 	Account string `json:"account"`
-	Detail  struct {
-		// Parameters that are important
-		Severity    float64     `json:"severity"`
-		Title       string      `json:"title"`
-		Type        string      `json:"type"`
-		UpdatedAt   string      `json:"updatedAt"`
-		AccountID   string      `json:"accountId"`
-		Description string      `json:"description"`
-		Resource    interface{} `json:"resource"`
-		Service     interface{} `json:"service"`
-		//Resource  InstanceResource `json:"resource"`
-		//Service       NetworkConnectionAction `json:"service"`
-
-		// Parameters that are not so important
-		Region        string `json:"region"`
-		Arn           string `json:"arn"`
-		CreatedAt     string `json:"createdAt"`
-		ID            string `json:"id"`
-		Partition     string `json:"partition"`
-		SchemaVersion string `json:"schemaVersion"`
-	} `json:"detail"`
+	Detail  GuardDutyRequestDetail `json:"detail"`
 	Detail_type string        `json:"detail-type"`
 	ID          string        `json:"id"`
 	Region      string        `json:"region"`
@@ -163,6 +145,28 @@ type GuardDutyRequest struct {
 	Source      string        `json:"source"`
 	Time        string        `json:"time"`
 	Version     string        `json:"version"`
+}
+
+type GuardDutyRequestDetail struct {
+	// Parameters that are important
+	Severity    float64     `json:"severity"`
+	Title       string      `json:"title"`
+	Type        string      `json:"type"`
+	UpdatedAt   string      `json:"updatedAt"`
+	AccountID   string      `json:"accountId"`
+	Description string      `json:"description"`
+	Resource    interface{} `json:"resource"`
+	Service     interface{} `json:"service"`
+	//Resource  InstanceResource `json:"resource"`
+	//Service       NetworkConnectionAction `json:"service"`
+
+	// Parameters that are not so important
+	Region        string `json:"region"`
+	Arn           string `json:"arn"`
+	CreatedAt     string `json:"createdAt"`
+	ID            string `json:"id"`
+	Partition     string `json:"partition"`
+	SchemaVersion string `json:"schemaVersion"`
 }
 
 type PortProbeAction struct {
