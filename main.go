@@ -122,11 +122,6 @@ func mapSeverityToLevel(request CloudWatchEventForGuardDuty) (*Severity, error) 
 	return nil, errors.New("Severity was not in right range: 0~10.0")
 }
 
-type ProbeEvents struct {
-	EventLastSeen  string `json:"eventLastSeen"`
-	Count          int    `json:"count"`
-}
-
 // CloudWatchEventForGuardDuty: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_cloudwatch.html
 type CloudWatchEventForGuardDuty struct {
 	Account     string           `json:"account"`
@@ -159,7 +154,7 @@ type GuardDutyFinding struct {
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	Severity    float64     `json:"severity"`
-	Confidence  float64  `json:"confidence"`
+	Confidence  float64  `json:"confidence,omitempty"`
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt   string      `json:"updatedAt"`
 }
