@@ -101,9 +101,7 @@ func mapSeverityToLevel(request CloudWatchEventForGuardDuty) (*Severity, error) 
 	s.AccountAlias = request.Detail.AccountID
 
 	if request.Detail_type == "Recon:EC2/PortProbeUnprotectedPort" {
-		gd := &CloudWatchEventForGuardDuty{Detail: GuardDutyFinding{Service: PortProbeAction{}}}
-
-		fmt.Println(gd.Detail.Service.(PortProbeAction).Count)
+		fmt.Println(request.Detail.Service.Count)
 	}
 
 	if 0 <= severity && severity < 4 {
