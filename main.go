@@ -157,12 +157,11 @@ type GuardDutyFinding struct {
 	Resource    interface{} `json:"resource"`
 	// Additional information assigned to the generated finding by GuardDuty
 	// ex:  NetworkConnectionAction `json:"service"`
-	Service     interface{} `json:"service"`
+	Service     Service `json:"service"`
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	Severity    float64     `json:"severity"`
 	Confidence  float64  `json:"confidence"`
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt   string      `json:"updatedAt"`
-
 }

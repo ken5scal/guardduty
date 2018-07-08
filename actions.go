@@ -23,25 +23,7 @@ type PortProbeAction struct {
 				Port     int    `json:"port"`
 				PortName string `json:"portName"`
 			} `json:"localPortDetails"`
-			RemoteIPDetails struct {
-				Country struct {
-					CountryName string `json:"countryName"`
-				} `json:"country"`
-				City struct {
-					CityName string `json:"cityName"`
-				} `json:"city"`
-				GeoLocation struct {
-					Lon float64 `json:"lon"`
-					Lat float64 `json:"lat"`
-				} `json:"geoLocation"`
-				Organization struct {
-					AsnOrg string `json:"asnOrg"`
-					Org    string `json:"org"`
-					Isp    string `json:"isp"`
-					Asn    string `json:"asn"`
-				} `json:"organization"`
-				IPAddressV4 string `json:"ipAddressV4"`
-			} `json:"remoteIpDetails"`
+			RemoteIPDetails RemoteIPDetails `json:"remoteIpDetails"`
 		} `json:"portProbeDetails"`
 		Blocked bool `json:"blocked"`
 	} `json:"dnsRequestAction"`
@@ -60,6 +42,26 @@ type NetworkConnectionAction struct {
 	ActionType              string `json:"actionType"`
 	NetworkConnectionAction struct {
 		ConnectionDirection string `json:"connectionDirection"`
+		LocalPortDetails    struct {
+			Port     int    `json:"port"`
+			PortName string `json:"portName"`
+		} `json:"localPortDetails"`
+		RemoteIPDetails RemoteIPDetails`json:"remoteIpDetails"`
+		RemotePortDetails struct {
+			Port     int    `json:"port"`
+			PortName string `json:"portName"`
+		} `json:"remotePortDetails"`
+		Protocol        string `json:"protocol"`
+		Blocked             bool   `json:"blocked"`
+	} `json:"networkConnectionAction"`
+}
+
+type AwsApiCallAction struct {
+	ActionType              string `json:"actionType"`
+	AwsApiCallAction struct {
+		Api string `json:"api"`
+		ServiceName string `json:"serviceName"`
+		CallerType string  `json:"callerType"`
 		RemoteIPDetails struct {
 			IPAddressV4 string `json:"ipAddressV4"`
 			Organization struct {
@@ -79,17 +81,27 @@ type NetworkConnectionAction struct {
 				Lat int `json:"lat"`
 				Lon int `json:"lon"`
 			} `json:"geoLocation"`
-
 		} `json:"remoteIpDetails"`
-		RemotePortDetails struct {
-			Port     int    `json:"port"`
-			PortName string `json:"portName"`
-		} `json:"remotePortDetails"`
-		LocalPortDetails    struct {
-			Port     int    `json:"port"`
-			PortName string `json:"portName"`
-		} `json:"localPortDetails"`
-		Protocol        string `json:"protocol"`
-		Blocked             bool   `json:"blocked"`
-	} `json:"networkConnectionAction"`
+	} `json:"awsApiCallAction"`
+}
+
+type RemoteIPDetails struct {
+	IPAddressV4 string `json:"ipAddressV4"`
+	Organization struct {
+		Asn int    `json:"asn"`
+		AsnOrg int    `json:"asnOrg"`
+		Isp string `json:"isp"`
+		Org string `json:"org"`
+	} `json:"organization"`
+	Country struct {
+		CountryName string `json:"countryName"`
+		CountryCode string `json:"countryCode,omitempty"`
+	} `json:"country"`
+	City struct {
+		CityName string `json:"cityName"`
+	} `json:"city"`
+	GeoLocation struct {
+		Lat int `json:"lat"`
+		Lon int `json:"lon"`
+	} `json:"geoLocation"`
 }
