@@ -74,5 +74,3 @@ func HandleRequest(instanceId string) (string, error) {
 
 	return fmt.Sprintf("Copied Snapshot %s!", copySnapshotInput.SourceSnapshotId), nil
 }
-
-vol-0887c2e4296eb5198
