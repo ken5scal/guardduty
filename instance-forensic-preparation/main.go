@@ -24,7 +24,7 @@ var describeInstancesInput =  &ec2.DescribeInstancesInput{
 var copySnapshotInput = &ec2.CopySnapshotInput{
 	Description: aws.String("Snapshot taken for forensic purpose"),
 	DryRun: aws.Bool(true),
-	//Encrypted: aws.Bool(true),
+	//Encrypted: aws.Bool(true), // for now
 	SourceRegion: aws.String("ap-northeast-1"),
 }
 var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
@@ -75,3 +75,4 @@ func HandleRequest(instanceId string) (string, error) {
 	return fmt.Sprintf("Copied Snapshot %s!", copySnapshotInput.SourceSnapshotId), nil
 }
 
+vol-0887c2e4296eb5198
