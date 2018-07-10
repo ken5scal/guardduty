@@ -1,13 +1,13 @@
 package main
 
 type Service struct {
-	ServiceName    string `json:"serviceName"`
-	DetectorID     string `json:"detectorId"`
+	ServiceName    string      `json:"serviceName"`
+	DetectorID     string      `json:"detectorId"`
 	Action         interface{} `json:"action"`
-	ResourceRole   string `json:"resourceRole"`
+	ResourceRole   string      `json:"resourceRole"`
 	AdditionalInfo struct {
-		ThreatListName  string `json:"threatListName"`
-		ThreatName         int    `json:"threatName"`
+		ThreatListName string `json:"threatListName"`
+		ThreatName     int    `json:"threatName"`
 	} `json:"additionalInfo"`
 	EventFirstSeen string `json:"eventFirstSeen"`
 	EventLastSeen  string `json:"eventLastSeen"`
@@ -30,11 +30,11 @@ type PortProbeAction struct {
 }
 
 type DnsRequestAction struct {
-	ActionType      string `json:"actionType"`
-	DnsRequestAction struct{
-		Domain string `json:"domain"`
-		Protocol string  `json:"protocol"`
-		Blocked bool `json:"blocked"`
+	ActionType       string `json:"actionType"`
+	DnsRequestAction struct {
+		Domain   string `json:"domain"`
+		Protocol string `json:"protocol"`
+		Blocked  bool   `json:"blocked"`
 	} `json:"networkConnectionAction"`
 }
 
@@ -46,29 +46,29 @@ type NetworkConnectionAction struct {
 			Port     int    `json:"port"`
 			PortName string `json:"portName"`
 		} `json:"localPortDetails"`
-		RemoteIPDetails RemoteIPDetails`json:"remoteIpDetails"`
+		RemoteIPDetails   RemoteIPDetails `json:"remoteIpDetails"`
 		RemotePortDetails struct {
 			Port     int    `json:"port"`
 			PortName string `json:"portName"`
 		} `json:"remotePortDetails"`
-		Protocol        string `json:"protocol"`
-		Blocked             bool   `json:"blocked"`
+		Protocol string `json:"protocol"`
+		Blocked  bool   `json:"blocked"`
 	} `json:"networkConnectionAction"`
 }
 
 type AwsApiCallAction struct {
-	ActionType              string `json:"actionType"`
+	ActionType       string `json:"actionType"`
 	AwsApiCallAction struct {
-		Api string `json:"api"`
-		ServiceName string `json:"serviceName"`
-		CallerType string  `json:"callerType"`
+		Api             string `json:"api"`
+		ServiceName     string `json:"serviceName"`
+		CallerType      string `json:"callerType"`
 		RemoteIPDetails struct {
-			IPAddressV4 string `json:"ipAddressV4"`
+			IPAddressV4  string `json:"ipAddressV4"`
 			Organization struct {
-				Asn int    `json:"asn"`
+				Asn    int    `json:"asn"`
 				AsnOrg int    `json:"asnOrg"`
-				Isp string `json:"isp"`
-				Org string `json:"org"`
+				Isp    string `json:"isp"`
+				Org    string `json:"org"`
 			} `json:"organization"`
 			Country struct {
 				CountryName string `json:"countryName"`
@@ -86,12 +86,12 @@ type AwsApiCallAction struct {
 }
 
 type RemoteIPDetails struct {
-	IPAddressV4 string `json:"ipAddressV4"`
+	IPAddressV4  string `json:"ipAddressV4"`
 	Organization struct {
-		Asn int    `json:"asn"`
+		Asn    int    `json:"asn"`
 		AsnOrg int    `json:"asnOrg"`
-		Isp string `json:"isp"`
-		Org string `json:"org"`
+		Isp    string `json:"isp"`
+		Org    string `json:"org"`
 	} `json:"organization"`
 	Country struct {
 		CountryName string `json:"countryName"`

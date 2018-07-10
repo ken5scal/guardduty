@@ -1,34 +1,34 @@
 package main
 
 import (
-	"github.com/aws/aws-lambda-go/lambda"
-	"fmt"
+	"context"
 	"errors"
+	"fmt"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"context"
 	"time"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 var timeout = time.Duration(5 * time.Minute)
 var stopInstancesInput = &ec2.StopInstancesInput{
-	DryRun: aws.Bool(true),
-	Force: aws.Bool(true),
+	DryRun:      aws.Bool(true),
+	Force:       aws.Bool(true),
 	InstanceIds: []*string{},
 }
-var describeInstancesInput =  &ec2.DescribeInstancesInput{
-	DryRun: aws.Bool(true),
+var describeInstancesInput = &ec2.DescribeInstancesInput{
+	DryRun:      aws.Bool(true),
 	InstanceIds: []*string{},
 }
 var copySnapshotInput = &ec2.CopySnapshotInput{
 	Description: aws.String("Snapshot taken for forensic purpose"),
-	DryRun: aws.Bool(true),
+	DryRun:      aws.Bool(true),
 	//Encrypted: aws.Bool(true), // for now
 	SourceRegion: aws.String("ap-northeast-1"),
 }
 var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
-	DryRun: aws.Bool(true),
+	DryRun:    aws.Bool(true),
 	Attribute: aws.String("blockDeviceMapping"),
 }
 

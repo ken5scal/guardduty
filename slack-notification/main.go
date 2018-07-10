@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/lambda"
-	"net/http"
 	"github.com/nlopes/slack"
-	"encoding/json"
-	"bytes"
+	"net/http"
 	"os"
 )
 
@@ -48,11 +48,10 @@ func postOnSlack(request CloudWatchEventForGuardDuty) error {
 		pretext = "<!here> " + pretext
 	}
 
-
 	attachment := slack.Attachment{
-		Color: severity.Color,
+		Color:   severity.Color,
 		Pretext: pretext,
-		Title: request.Detail.Title,
+		Title:   request.Detail.Title,
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Severity",
@@ -90,9 +89,9 @@ func postOnSlack(request CloudWatchEventForGuardDuty) error {
 
 type Severity struct {
 	AccountAlias string
-	Level string
-	Color string
-	Announce bool
+	Level        string
+	Color        string
+	Announce     bool
 }
 
 func mapSeverityToLevel(request CloudWatchEventForGuardDuty) (*Severity, error) {
@@ -139,22 +138,22 @@ type CloudWatchEventForGuardDuty struct {
 type GuardDutyFinding struct {
 	// Parameters that are not so important
 	SchemaVersion string `json:"schemaVersion"`
-	AccountID   string      `json:"accountId"`
+	AccountID     string `json:"accountId"`
 	Region        string `json:"region"`
 	Partition     string `json:"partition"`
 	ID            string `json:"id"`
 	Arn           string `json:"arn"`
-	Type        string      `json:"type"`
+	Type          string `json:"type"`
 	// The AWS resource that is associated with the activity that prompted GuardDuty to generate a finding
 	// ex: //InstanceResource `json:"resource"
-	Resource    interface{} `json:"resource"`
+	Resource interface{} `json:"resource"`
 	// Additional information assigned to the generated finding by GuardDuty
 	// ex:  NetworkConnectionAction `json:"service"`
 	Service     Service `json:"service"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Severity    float64     `json:"severity"`
-	Confidence  float64  `json:"confidence,omitempty"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt   string      `json:"updatedAt"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Severity    float64 `json:"severity"`
+	Confidence  float64 `json:"confidence,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
+	UpdatedAt   string  `json:"updatedAt"`
 }

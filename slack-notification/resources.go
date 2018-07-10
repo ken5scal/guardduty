@@ -4,10 +4,10 @@ package main
 type InstanceResource struct {
 	ResourceType    string `json:"resourceType"`
 	InstanceDetails struct {
-		AvailabilityZone  string `json:"availabilityZone"`
-		IamInstanceProfile struct{
-			Arn  string  `json:"arn"`
-			ID   string `json:"id"`
+		AvailabilityZone   string `json:"availabilityZone"`
+		IamInstanceProfile struct {
+			Arn string `json:"arn"`
+			ID  string `json:"id"`
 		} `json:"iamInstanceProfile,omitempty"`
 		ImageDescription  string `json:"imageDescription"`
 		ImageID           string `json:"imageId"`
@@ -42,8 +42,8 @@ type InstanceResource struct {
 
 // https://docs.aws.amazon.com/guardduty/latest/ug/get-findings.html#get-findings-response-syntax
 type AccessKeyResource struct {
-	ResourceType    string `json:"resourceType"`
-	AccessKeyDetails struct{
+	ResourceType     string `json:"resourceType"`
+	AccessKeyDetails struct {
 		AccessKeyId string `json:"accessKeyId"`
 		PrincipalID string `json:"principalId"`
 		UserType    string `json:"userType"`
