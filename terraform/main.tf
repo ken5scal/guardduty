@@ -3,8 +3,8 @@ provider "aws" {
 }
 
 provider "aws" {
-  alias = "member"
-  region = "ap-northeast-1"
+  alias   = "member"
+  region  = "ap-northeast-1"
   profile = "sub"
 }
 
@@ -42,7 +42,7 @@ resource "aws_iam_policy" "example" {
 
 data "aws_iam_policy_document" "example" {
   statement {
-    actions = ["s3:ListAllMyBuckets"]
+    actions   = ["s3:ListAllMyBuckets"]
     resources = ["arn:aws:s3:::*"]
   }
 }
