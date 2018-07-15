@@ -65,6 +65,10 @@ func HandleRequest(instanceId string) (string, error) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5 *time.Minute)
 	defer cancelFn()
 
+	// TODO Remove security group
+	// But couldn't have found function that changes security gorup
+
+
 	// Stop Instance
 	// TODO Check status of instance first: exists? just stopped?
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
@@ -104,6 +108,17 @@ func HandleRequest(instanceId string) (string, error) {
 		return "", err
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
+
+	//TODO Create AMI
+	ci := &ec2.CreateImageInput{ //creates and registers the AMI in a single request, so you don't have to register the AMI yourself.
+		BlockDeviceMappings:
+	}
+	// どちらでもよさそう。BlockDeviceMapping内のEbsBlockDevice内にsnapshotIdがある
+	svc.RegisterImage()
+	svc.CreateImage()
+
+	// TODO Run Instance in Forensic VPC
+	svc.RunInstances()
 
 	return fmt.Sprintf("Created Snapshot %s!", snapShot.SnapshotId), nil
 }
