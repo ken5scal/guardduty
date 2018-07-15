@@ -65,19 +65,19 @@ func HandleRequest(instanceId string) (string, error) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5 *time.Minute)
 	defer cancelFn()
 
+	// Stop Instance
 	// TODO Check status of instance first: exists? just stopped?
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
 	if _, err := svc.StopInstancesWithContext(ctx, stopInstancesInput); err != nil {
-		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
-		return "", err
-	}
-
-	if err := svc.WaitUntilInstanceStoppedWithContext(ctx, describeInstancesInput); err != nil {
-		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
-		return "", err
+		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
+	} else {
+		if err := svc.WaitUntilInstanceStoppedWithContext(ctx, describeInstancesInput); err != nil {
+			logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
+		}
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
 
+	// Describe Instance
 	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
 	out, err := svc.DescribeInstanceAttributeWithContext(ctx, describeEc2AttributeInput)
 	if err != nil {
@@ -86,6 +86,9 @@ func HandleRequest(instanceId string) (string, error) {
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
 
+	/*
+	//  Create a Snapshot
+	 */
 	// assuming there is only one volume
 	createSnapshotInput.VolumeId = out.BlockDeviceMappings[0].Ebs.VolumeId
 	createSnapshotInput.TagSpecifications = []*ec2.TagSpecification{
