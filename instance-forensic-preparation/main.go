@@ -16,32 +16,37 @@ import (
 
 var timeout = time.Duration(5 * time.Minute)
 var stopInstancesInput = &ec2.StopInstancesInput{
-	DryRun:      aws.Bool(true),
 	Force:       aws.Bool(true),
 	InstanceIds: []*string{},
 }
 var describeInstancesInput = &ec2.DescribeInstancesInput{
-	DryRun:      aws.Bool(true),
 	InstanceIds: []*string{},
 }
-var copySnapshotInput = &ec2.CopySnapshotInput{
+var createSnapshotInput = &ec2.CreateSnapshotInput{
 	Description: aws.String("Snapshot taken for forensic purpose"),
-	DryRun:      aws.Bool(true),
+	TagSpecifications: []*ec2.TagSpecification{},
 	//Encrypted: aws.Bool(true), // for now
-	SourceRegion: aws.String("ap-northeast-1"),
 }
 var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
-	DryRun:    aws.Bool(true),
 	Attribute: aws.String("blockDeviceMapping"),
 }
 var logger = zerolog.New(os.Stdout).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
 
-func main() {
+var slackURL, forensicVPC string
+
+func init() {
+	slackURL = os.Getenv("SLACK_URL")
+	forensicVPC = os.Getenv("FORENSIC_VPC")
 	zerolog.TimeFieldFormat = ""
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	lambda.Start(HandleRequest)
 }
 
+func main() {
+	if slackURL == "" || forensicVPC == "" {
+		logger.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
+	}
+	lambda.Start(HandleRequest)
+}
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
 func HandleRequest(instanceId string) (string, error) {
 	if instanceId == "" {
@@ -57,9 +62,10 @@ func HandleRequest(instanceId string) (string, error) {
 	svc := ec2.New(s)
 
 	// Abort the upload if it takes more than the passed in timeout.
-	ctx, cancelFn := context.WithTimeout(context.Background(), timeout)
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5 *time.Minute)
 	defer cancelFn()
 
+	// TODO Check status of instance first: exists? just stopped?
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
 	if _, err := svc.StopInstancesWithContext(ctx, stopInstancesInput); err != nil {
 		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
@@ -81,15 +87,22 @@ func HandleRequest(instanceId string) (string, error) {
 	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
 
 	// assuming there is only one volume
-	copySnapshotInput.SourceSnapshotId = out.BlockDeviceMappings[0].Ebs.VolumeId
+	createSnapshotInput.VolumeId = out.BlockDeviceMappings[0].Ebs.VolumeId
+	createSnapshotInput.TagSpecifications = []*ec2.TagSpecification{
+		{
+			ResourceType: aws.String("instance"),
+			Tags: []*ec2.Tag{{Key: aws.String("hoge"), Value:aws.String("fuga")}},
+		},
+	}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
-	if _, err := svc.CopySnapshotWithContext(ctx, copySnapshotInput); err != nil {
+	snapShot, err := svc.CreateSnapshotWithContext(ctx, createSnapshotInput)
+	if err != nil {
 		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 		return "", err
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
-	return fmt.Sprintf("Copied Snapshot %s!", copySnapshotInput.SourceSnapshotId), nil
+	return fmt.Sprintf("Created Snapshot %s!", snapShot.SnapshotId), nil
 }
 
 // CloudWatchEventForGuardDuty: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_cloudwatch.html
@@ -109,3 +122,4 @@ type CloudWatchEventForGuardDuty struct {
 func returnDuration() string {
 	return string(time.Now().Format("05.00"))
 }
+
