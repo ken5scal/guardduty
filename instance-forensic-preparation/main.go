@@ -209,10 +209,10 @@ type EC2Forensic struct {
 func (e *EC2Forensic) StopInstance() error {
 	var stopInstancesInput = &ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
-		InstanceIds: []*string{},
+		InstanceIds: []*string{aws.String(e.InstanceId)},
 	}
 	var describeInstancesInput = &ec2.DescribeInstancesInput{
-		InstanceIds: []*string{},
+		InstanceIds: []*string{aws.String(e.InstanceId)},
 	}
 
 	if _, err := e.svc.StopInstances(stopInstancesInput); err != nil {
@@ -316,7 +316,7 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 	}
 
 	var instanceState string
-	for instanceState == "running" {
+	for instanceState != "running" {
 		output, err := e.svc.DescribeInstanceStatus(&ec2.DescribeInstanceStatusInput{
 			InstanceIds:[]*string{output.Instances[0].InstanceId},
 			IncludeAllInstances: aws.Bool(true),
