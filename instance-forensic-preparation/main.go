@@ -53,47 +53,48 @@ func HandleRequest(instanceId string) error {
 		InstanceId:      instanceId,
 	}
 
+	notify(false, false, nil, fmt.Sprintf("Started forensic preparation: %v", instanceId))
+
 	// Stop Instance (Immediately, because it is suspected to be infected)
-	postOnSlack(false, false, fmt.Sprintf("Started forensic preparation: %v", instanceId))
 	if err := forensic.StopInstance(); err != nil {
-		postOnSlack(true, false, "Failed Stopping Instance")
+		notify(true, false, nil, "Failed Stopping Instance")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stop instance").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprintf("Stopped Instance: %v", instanceId))
+	notify(false, false, nil, fmt.Sprintf("Stopped Instance: %v", instanceId))
 
 	// Create a snapshot for an evidence
 	snapShotId, err := forensic.CreateEvidenceSnapshot()
 	if err != nil {
-		postOnSlack(true, false, "Failed taking a Snapshot")
+		notify(true, false, nil, "Failed taking a Snapshot")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprintf("Created a snapshot for evidence: %v", snapShotId))
+	notify(false, false, nil, fmt.Sprintf("Created a snapshot for evidence: %v", snapShotId))
 
 	// Create EBS from snapshot
 	volumeId, err := forensic.CreateEvidenceEBS(snapShotId)
 	if err != nil {
-		postOnSlack(true, false, "Failed creating EBS from snapshot")
+		notify(true, false, nil, "Failed creating EBS from snapshot")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprintf("Created EBS volume from snapshot: %v", volumeId))
+	notify(false, false, nil, fmt.Sprintf("Created EBS volume from snapshot: %v", volumeId))
 
 	// Start up a forensic workstation
 	// TODO This can be run concurrently
 	workstationId, err := forensic.StartForensicWorkstation()
 	if err != nil {
-		postOnSlack(true, false, "Failed starting up forensic workstation")
+		notify(true, false, nil, "Failed starting up forensic workstation")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprintf("Started up forensic workstation: %v", workstationId))
+	notify(false, false, nil, fmt.Sprintf("Started up forensic workstation: %v", workstationId))
 
 	// Attach Evidence EBS to Workstation
 	if err := forensic.AttachEvidenceToWorkstation(workstationId, volumeId); err != nil {
-		postOnSlack(true, false, "Failed attaching the evidence volume to forensic instance")
+		notify(true, false, nil, "Failed attaching the evidence volume to forensic instance")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprintf("Attached the evidence volume (%v) to forensic instance (%v)", volumeId, workstationId))
+	notify(false, false, nil, fmt.Sprintf("Attached the evidence volume (%v) to forensic instance (%v)", volumeId, workstationId))
 
-	postOnSlack(false, true, "Finished preparation for forensic")
+	notify(false, true, nil, "Finished preparation for forensic")
 	return nil
 }
 
@@ -169,7 +170,8 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 
 func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err error) {
 	input := &ec2.CreateVolumeInput{
-		AvailabilityZone: aws.String("ap-northeast-1d"), //ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
+		//ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
+		AvailabilityZone: aws.String("ap-northeast-1d"),
 		SnapshotId:       aws.String(snapshotId),
 		TagSpecifications: []*ec2.TagSpecification{
 			{
@@ -256,32 +258,32 @@ func returnDuration() string {
 	return string(time.Now().Format("05.00"))
 }
 
-func postOnSlack(isFailed bool, isCompleted bool, message string) error {
+func notify(isFailed bool, isCompleted bool, err error, message string) {
 	color := "#707070"
 	if isFailed {
 		color = "warning"
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", message).Msg("failed")
 	} else if isCompleted {
 		color = "good"
-	}
-
-	attachment := slack.Attachment{
-		Color:   color,
-		Pretext: "Forensic Preparation Status",
-		Title:   message,
+		log.Info().Str("duration", returnDuration()).Str("status", message).Msg("completed")
+	} else {
+		log.Info().Str("duration", returnDuration()).Str("status", message).Msg("started")
 	}
 
 	payload := slack.PostMessageParameters{
-		Attachments: []slack.Attachment{attachment},
+		Attachments: []slack.Attachment{{
+			Color:   color,
+			Pretext: "Forensic Preparation Status",
+			Title:   message,
+		}},
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return errors.New("failed to encode payload")
+		log.Info().Str("status", "failed").Msg("slack notification failed: failed to encode payload")
 	}
 
 	if _, err := http.Post(slackURL, "application/json", bytes.NewReader(body)); err != nil {
-		return errors.New(fmt.Sprintf("posting Slack failed: %v", err))
+		log.Info().Str("status", "failed").Msg("slack notification failed: http post failed")
 	}
-
-	return nil
 }
