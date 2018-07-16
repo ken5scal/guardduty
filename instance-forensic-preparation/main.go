@@ -1,28 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"time"
+	"github.com/nlopes/slack"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/nlopes/slack"
-	"os"
-	"fmt"
-	"encoding/json"
 	"net/http"
-	"bytes"
+	"os"
+	"time"
 )
 
 var slackURL, forensicVpcId, forensicSubnetId, forensicSgId string
-var forensicStatus = map[string]string{
-	"failed": "warning",
-	"succeeded": "good",
-	"started": "#707070",
-}
 
 func init() {
 	slackURL = os.Getenv("SLACK_URL")
@@ -43,19 +38,19 @@ func main() {
 }
 
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
-func HandleRequest(instanceId string) (error) {
+func HandleRequest(instanceId string) error {
 	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger()
 
 	if instanceId == "" {
-		return errors.New("Empty InstanceId")
+		return errors.New("empty instanceId")
 	}
 
 	forensic := &EC2Forensic{
-		svc: ec2.New(session.Must(session.NewSession())),
-		VpcId: forensicVpcId,
-		SubnetId: forensicSubnetId,
+		svc:             ec2.New(session.Must(session.NewSession())),
+		VpcId:           forensicVpcId,
+		SubnetId:        forensicSubnetId,
 		SecurityGroupId: forensicSgId,
-		InstanceId: instanceId,
+		InstanceId:      instanceId,
 	}
 
 	// Stop Instance (Immediately, because it is suspected to be infected)
@@ -103,10 +98,10 @@ func HandleRequest(instanceId string) (error) {
 }
 
 type EC2Forensic struct {
-	svc *ec2.EC2
-	InstanceId string
-	VpcId string
-	SubnetId string
+	svc             *ec2.EC2
+	InstanceId      string
+	VpcId           string
+	SubnetId        string
 	SecurityGroupId string
 }
 
@@ -134,7 +129,7 @@ func (e *EC2Forensic) StopInstance() error {
 // Take SnapShot of suspected EC2 instance for taking evidence
 func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 	describeEc2AttributeInput := &ec2.DescribeInstanceAttributeInput{
-		Attribute: aws.String("blockDeviceMapping"),
+		Attribute:  aws.String("blockDeviceMapping"),
 		InstanceId: aws.String(e.InstanceId),
 	}
 
@@ -143,7 +138,7 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String("snapshot"),
-				Tags: []*ec2.Tag{{Key: aws.String("Name"), Value:aws.String("forensic-snapshot")}},
+				Tags:         []*ec2.Tag{{Key: aws.String("Name"), Value: aws.String("forensic-snapshot")}},
 			},
 		},
 		//Encrypted: aws.Bool(true), // for now
@@ -161,7 +156,7 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 	}
 	// Check State
 	var snapShotState string
-	for snapShotState != "completed"  {
+	for snapShotState != "completed" {
 		output, err := e.svc.DescribeSnapshots(&ec2.DescribeSnapshotsInput{SnapshotIds: []*string{snapShot.SnapshotId}})
 		if err != nil {
 			return "", nil
@@ -175,11 +170,11 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err error) {
 	input := &ec2.CreateVolumeInput{
 		AvailabilityZone: aws.String("ap-northeast-1d"), //ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
-		SnapshotId: aws.String(snapshotId),
+		SnapshotId:       aws.String(snapshotId),
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String("volume"),
-				Tags: []*ec2.Tag{{Key: aws.String("Name"), Value:aws.String("forensic-ebs-volume")}},
+				Tags:         []*ec2.Tag{{Key: aws.String("Name"), Value: aws.String("forensic-ebs-volume")}},
 			},
 		},
 	}
@@ -192,7 +187,7 @@ func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err
 	var volumeState string
 	if volumeState != "ok" {
 		output, err := e.svc.DescribeVolumeStatus(&ec2.DescribeVolumeStatusInput{
-			VolumeIds:[]*string{output.VolumeId},
+			VolumeIds: []*string{output.VolumeId},
 		})
 		if err != nil {
 			return "", err
@@ -210,15 +205,15 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 			{
 				ResourceType: aws.String("instance"),
 				Tags: []*ec2.Tag{
-					{ Key: aws.String("Name"), Value:aws.String("forensic-workstation")},
-					{ Key: aws.String("Target"), Value: aws.String(e.InstanceId)},
+					{Key: aws.String("Name"), Value: aws.String("forensic-workstation")},
+					{Key: aws.String("Target"), Value: aws.String(e.InstanceId)},
 				},
 			},
 		},
-		MaxCount: aws.Int64(1),
-		MinCount: aws.Int64(1),
+		MaxCount:         aws.Int64(1),
+		MinCount:         aws.Int64(1),
 		SecurityGroupIds: []*string{aws.String(forensicSgId)},
-		SubnetId: aws.String(forensicSubnetId),
+		SubnetId:         aws.String(forensicSubnetId),
 		// Recommended in https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
 		InstanceType: aws.String("t2.large"),
 		// Latest(2018/07/15) ami id of Ubuntu Server 16.04 LTS (HVM), SSD Volume Type
@@ -234,7 +229,7 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 	var instanceState string
 	for instanceState != "running" {
 		output, err := e.svc.DescribeInstanceStatus(&ec2.DescribeInstanceStatusInput{
-			InstanceIds:[]*string{output.Instances[0].InstanceId},
+			InstanceIds:         []*string{output.Instances[0].InstanceId},
 			IncludeAllInstances: aws.Bool(true),
 		})
 		if err != nil {
@@ -251,8 +246,8 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 func (e *EC2Forensic) AttachEvidenceToWorkstation(workstationId, evidenceVolumeId string) (err error) {
 	_, err = e.svc.AttachVolume(&ec2.AttachVolumeInput{
 		InstanceId: aws.String(workstationId),
-		VolumeId: aws.String(evidenceVolumeId),
-		Device: aws.String("/dev/sdf"),
+		VolumeId:   aws.String(evidenceVolumeId),
+		Device:     aws.String("/dev/sdf"),
 	})
 	return
 }
