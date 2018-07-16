@@ -195,6 +195,8 @@ func HandleRequest(instanceId string) (string, error) {
 		MinCount: aws.Int64(1),
 		SecurityGroupIds: []*string{aws.String(forensicSgId)},
 		SubnetId: aws.String(forensicSubnetId),
+		InstanceType: aws.String("t2.micro"), //TODO put into config // maybe t2.large is better according to https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
+		ImageId: aws.String("ami-e99f4896"), //ToDo Add User Data or make it the latest
 	}
 
 	re, err := svc.RunInstances(ro)
