@@ -59,54 +59,44 @@ func HandleRequest(instanceId string) (error) {
 	}
 
 	// Stop Instance (Immediately, because it is suspected to be infected)
-	postOnSlack(false, false, fmt.Sprint("Started forensic preparation: %v", instanceId))
-	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
+	postOnSlack(false, false, fmt.Sprintf("Started forensic preparation: %v", instanceId))
 	if err := forensic.StopInstance(); err != nil {
 		postOnSlack(true, false, "Failed Stopping Instance")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stop instance").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprint("Stopped Instance: %v", instanceId))
-	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
+	postOnSlack(false, false, fmt.Sprintf("Stopped Instance: %v", instanceId))
 
 	// Create a snapshot for an evidence
-	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
 	snapShotId, err := forensic.CreateEvidenceSnapshot()
 	if err != nil {
 		postOnSlack(true, false, "Failed taking a Snapshot")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprint("Created a snapshot for evidence: %v", snapShotId))
-	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
+	postOnSlack(false, false, fmt.Sprintf("Created a snapshot for evidence: %v", snapShotId))
 
 	// Create EBS from snapshot
-	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("started")
 	volumeId, err := forensic.CreateEvidenceEBS(snapShotId)
 	if err != nil {
 		postOnSlack(true, false, "Failed creating EBS from snapshot")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprint("Created EBS volume from snapshot: %v", volumeId))
-	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("succeeded")
+	postOnSlack(false, false, fmt.Sprintf("Created EBS volume from snapshot: %v", volumeId))
 
 	// Start up a forensic workstation
 	// TODO This can be run concurrently
-	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
 	workstationId, err := forensic.StartForensicWorkstation()
 	if err != nil {
 		postOnSlack(true, false, "Failed starting up forensic workstation")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprint("Started up forensic workstation: %v", workstationId))
-	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
+	postOnSlack(false, false, fmt.Sprintf("Started up forensic workstation: %v", workstationId))
 
 	// Attach Evidence EBS to Workstation
-	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("started")
 	if err := forensic.AttachEvidenceToWorkstation(workstationId, volumeId); err != nil {
 		postOnSlack(true, false, "Failed attaching the evidence volume to forensic instance")
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("failed")
 	}
-	postOnSlack(false, false, fmt.Sprint("Attached the evidence volume (%v) to forensic instance (%v)", volumeId, workstationId))
-	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("succeeded")
+	postOnSlack(false, false, fmt.Sprintf("Attached the evidence volume (%v) to forensic instance (%v)", volumeId, workstationId))
 
 	postOnSlack(false, true, "Finished preparation for forensic")
 	return nil
@@ -281,7 +271,8 @@ func postOnSlack(isFailed bool, isCompleted bool, message string) error {
 
 	attachment := slack.Attachment{
 		Color:   color,
-		Title:   fmt.Sprintf("Forensic status: %v", message),
+		Pretext: "Forensic Preparation Status",
+		Title:   message,
 	}
 
 	payload := slack.PostMessageParameters{
