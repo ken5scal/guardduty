@@ -100,7 +100,6 @@ type EC2Forensic struct {
 // StopInstance stops running instance.
 // TODO Check status of instance first: exists? just stopped?
 func (e *EC2Forensic) StopInstance() error {
-	log.Info().Str("tagetInstanceId", e.InstanceId)
 	var stopInstancesInput = &ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
 		InstanceIds: []*string{aws.String(e.InstanceId)},
