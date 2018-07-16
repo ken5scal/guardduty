@@ -30,7 +30,6 @@ var createSnapshotInput = &ec2.CreateSnapshotInput{
 var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
 	Attribute: aws.String("blockDeviceMapping"),
 }
-var logger = zerolog.New(os.Stdout).With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
 
 var slackURL, forensicVpcId string
 
@@ -42,14 +41,18 @@ func init() {
 }
 
 func main() {
+	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger() //.Output(zerolog.ConsoleWriter{Out: os.Stdout})
+
 	if slackURL == "" || forensicVpcId == "" {
-		logger.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
+		log.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
 	}
 	//TODO Check existence of ForensicVPC
 	lambda.Start(HandleRequest)
 }
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
 func HandleRequest(instanceId string) (string, error) {
+	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
+
 	if instanceId == "" {
 		return "", errors.New("Empty InstanceId")
 	}
@@ -66,30 +69,25 @@ func HandleRequest(instanceId string) (string, error) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5 *time.Minute)
 	defer cancelFn()
 
-	// TODO Remove security group
-	// But couldn't have found function that changes security gorup
-
-
 	// Stop Instance
 	// TODO Check status of instance first: exists? just stopped?
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
 	if _, err := svc.StopInstancesWithContext(ctx, stopInstancesInput); err != nil {
-		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
 	} else {
 		if err := svc.WaitUntilInstanceStoppedWithContext(ctx, describeInstancesInput); err != nil {
-			logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
+			log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
 		}
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
 
 	// Describe Instance
-	logger.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
+	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
 	out, err := svc.DescribeInstanceAttributeWithContext(ctx, describeEc2AttributeInput)
 	if err != nil {
-		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "describe instance").Msg("failed")
-		return "", err
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "describe instance").Msg("failed")
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
 
 	/*
 	//  Create a Snapshot
@@ -98,31 +96,29 @@ func HandleRequest(instanceId string) (string, error) {
 	createSnapshotInput.VolumeId = out.BlockDeviceMappings[0].Ebs.VolumeId
 	createSnapshotInput.TagSpecifications = []*ec2.TagSpecification{
 		{
-			ResourceType: aws.String("instance"),
-			Tags: []*ec2.Tag{{Key: aws.String("hoge"), Value:aws.String("fuga")}},
+			ResourceType: aws.String("snapshot"),
+			Tags: []*ec2.Tag{{Key: aws.String("Name"), Value:aws.String("forensic-snapshot")}},
 		},
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
+	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
 	snapShot, err := svc.CreateSnapshotWithContext(ctx, createSnapshotInput)
 	if err != nil {
-		logger.Error().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
-		return "", err
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
 	// Create AMI
-	logger.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("started")
+	log.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("started")
 	ii := &ec2.ImportImageInput{
 		DiskContainers: []*ec2.ImageDiskContainer{
 			{
-				DeviceName: aws.String("Forensic Image"),
 				SnapshotId: snapShot.SnapshotId,
 			},
 		},
 	}
 	io, err := svc.ImportImage(ii)
 	if err != nil {
-		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
 	}
 
 	// Check Status
@@ -132,32 +128,32 @@ func HandleRequest(instanceId string) (string, error) {
 			ImportTaskIds: []*string{io.ImportTaskId},
 		})
 		if err != nil {
-			logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+			log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
 		}
 		importStatus = *do.ImportImageTasks[0].Status
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("succeeded")
 
 	// Create Isolated Security Group
-	logger.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
 	csgi := &ec2.CreateSecurityGroupInput{
 		VpcId: aws.String(forensicVpcId),
 		GroupName: aws.String("forensic-isolation-sg"),
 	}
 	csgo, err := svc.CreateSecurityGroup(csgi)
 	if err != nil {
-		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
 	}
 	if _, err := svc.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
 		GroupId: csgo.GroupId,
 		IpPermissions:[]*ec2.IpPermission{},
 	}); err != nil {
-		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("completed")
+	log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("completed")
 
 	// Run Instance in Forensic VPC
-	logger.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
+	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
 	ro := &ec2.RunInstancesInput{
 		TagSpecifications: []*ec2.TagSpecification{
 			{
@@ -174,9 +170,9 @@ func HandleRequest(instanceId string) (string, error) {
 		SecurityGroupIds: []*string{csgo.GroupId},
 	}
 	if _, err = svc.RunInstances(ro); err != nil {
-		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
-	logger.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
+	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
 
 	return fmt.Sprintf("Created Snapshot %s!", snapShot.SnapshotId), nil
 }
