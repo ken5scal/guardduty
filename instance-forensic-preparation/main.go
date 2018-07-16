@@ -183,8 +183,7 @@ func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err
 	return *output.VolumeId, nil
 }
 
-//TODO put into config // maybe t2.large is better according to https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
-//ToDo Add User Data or make it the latest
+//ToDo Add User Data and make it the latest
 func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err error) {
 	input := &ec2.RunInstancesInput{
 		TagSpecifications: []*ec2.TagSpecification{
@@ -200,8 +199,11 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 		MinCount: aws.Int64(1),
 		SecurityGroupIds: []*string{aws.String(forensicSgId)},
 		SubnetId: aws.String(forensicSubnetId),
-		InstanceType: aws.String("t2.micro"), // maybe t2.large
-		ImageId: aws.String("ami-e99f4896"),  // maybe Ubuntu Server 16.04 LTS (HVM), SSD Volume Type - ami-940cdceb (2018/07/15)
+		// Recommended in https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
+		InstanceType: aws.String("t2.large"),
+		// Latest(2018/07/15) ami id of Ubuntu Server 16.04 LTS (HVM), SSD Volume Type
+		// Recommended in https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
+		ImageId: aws.String("ami-940cdceb"),
 	}
 
 	output, err := e.svc.RunInstances(input)
