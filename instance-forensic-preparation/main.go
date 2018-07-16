@@ -30,19 +30,19 @@ var createSnapshotInput = &ec2.CreateSnapshotInput{
 var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
 	Attribute: aws.String("blockDeviceMapping"),
 }
-var logger = zerolog.New(os.Stdout).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
+var logger = zerolog.New(os.Stdout).With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
 
-var slackURL, forensicVPC string
+var slackURL, forensicVpcId string
 
 func init() {
 	slackURL = os.Getenv("SLACK_URL")
-	forensicVPC = os.Getenv("FORENSIC_VPC")
+	forensicVpcId = os.Getenv("FORENSIC_VPC")
 	zerolog.TimeFieldFormat = ""
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
 func main() {
-	if slackURL == "" || forensicVPC == "" {
+	if slackURL == "" || forensicVpcId == "" {
 		logger.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
 	}
 	lambda.Start(HandleRequest)
@@ -79,16 +79,16 @@ func HandleRequest(instanceId string) (string, error) {
 			logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
 		}
 	}
-	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
+	logger.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
 
 	// Describe Instance
-	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
+	logger.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
 	out, err := svc.DescribeInstanceAttributeWithContext(ctx, describeEc2AttributeInput)
 	if err != nil {
 		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "describe instance").Msg("failed")
 		return "", err
 	}
-	log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
+	logger.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
 
 	/*
 	//  Create a Snapshot
@@ -101,24 +101,63 @@ func HandleRequest(instanceId string) (string, error) {
 			Tags: []*ec2.Tag{{Key: aws.String("hoge"), Value:aws.String("fuga")}},
 		},
 	}
-	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
+	logger.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
 	snapShot, err := svc.CreateSnapshotWithContext(ctx, createSnapshotInput)
 	if err != nil {
-		log.Error().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
+		logger.Error().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 		return "", err
 	}
-	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
+	logger.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
-	//TODO Create AMI
-	ci := &ec2.CreateImageInput{ //creates and registers the AMI in a single request, so you don't have to register the AMI yourself.
-		BlockDeviceMappings:
+	// Create AMI
+	logger.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("started")
+	ii := &ec2.ImportImageInput{
+		DiskContainers: []*ec2.ImageDiskContainer{
+			{
+				DeviceName: aws.String("Forensic Image"),
+				SnapshotId: snapShot.SnapshotId,
+			},
+		},
 	}
-	// どちらでもよさそう。BlockDeviceMapping内のEbsBlockDevice内にsnapshotIdがある
-	svc.RegisterImage()
-	svc.CreateImage()
+	io, err := svc.ImportImage(ii)
+	if err != nil {
+		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+	}
+
+	// Check Status
+	var importStatus string
+	for importStatus != "completed"  {
+		do, err := svc.DescribeImportImageTasks(&ec2.DescribeImportImageTasksInput{
+			ImportTaskIds: []*string{io.ImportTaskId},
+		})
+		if err != nil {
+			logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+		}
+		importStatus = *do.ImportImageTasks[0].Status
+	}
+	logger.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("succeeded")
 
 	// TODO Run Instance in Forensic VPC
-	svc.RunInstances()
+	//svc.createSecurityGroup
+	logger.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
+	ro := &ec2.RunInstancesInput{
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				Tags: []*ec2.Tag{
+					{
+						Key: aws.String("Name"), Value:aws.String("forensic-instance"),
+					},
+				},
+			},
+		},
+		ImageId: io.ImageId,
+		MaxCount: aws.Int64(1),
+		MinCount: aws.Int64(1),
+	}
+	if _, err = svc.RunInstances(ro); err != nil {
+		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
+	}
+	logger.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
 
 	return fmt.Sprintf("Created Snapshot %s!", snapShot.SnapshotId), nil
 }
