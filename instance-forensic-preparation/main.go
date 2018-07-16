@@ -31,19 +31,20 @@ var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
 	Attribute: aws.String("blockDeviceMapping"),
 }
 
-var slackURL, forensicVpcId, forensicSubnetId string
+var slackURL, forensicVpcId, forensicSubnetId, forensicSgId string
 
 func init() {
 	slackURL = os.Getenv("SLACK_URL")
 	forensicVpcId = os.Getenv("FORENSIC_VPC_ID")
 	forensicSubnetId = os.Getenv("FORENSIC_SUBNET_ID")
+	forensicSgId = os.Getenv("FORENSIC_SG_ID")
 	zerolog.TimeFieldFormat = ""
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
 func main() {
-	if slackURL == "" || forensicVpcId == "" || forensicSubnetId == "" {
-		log.Fatal().Msg("you must set Env Var `SLACK_URL`, `FORENSIC_VPC_ID` and `FORENSIC_SUBNET_ID`")
+	if slackURL == "" || forensicVpcId == "" || forensicSubnetId == "" || forensicSgId == "" {
+		log.Fatal().Msg("you must set Env Var `SLACK_URL`, `FORENSIC_VPC_ID`, `FORENSIC_SG_ID` and `FORENSIC_SUBNET_ID`")
 	}
 	//TODO Check existence of ForensicVPC/ForensicSubnet
 	lambda.Start(HandleRequest)
@@ -160,22 +161,22 @@ func HandleRequest(instanceId string) (string, error) {
 	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("succeeded")
 
 	// Create Isolated Security Group
-	log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
-	csgi := &ec2.CreateSecurityGroupInput{
-		VpcId: aws.String(forensicVpcId),
-		GroupName: aws.String("forensic-isolation-sg"),
-	}
-	csgo, err := svc.CreateSecurityGroup(csgi)
-	if err != nil {
-		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
-	}
-	if _, err := svc.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
-		GroupId: csgo.GroupId,
-		IpPermissions:[]*ec2.IpPermission{},
-	}); err != nil {
-		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
-	}
-	log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("completed")
+	//log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
+	//csgi := &ec2.CreateSecurityGroupInput{
+	//	VpcId: aws.String(forensicVpcId),
+	//	GroupName: aws.String("forensic-isolation-sg"),
+	//}
+	//csgo, err := svc.CreateSecurityGroup(csgi)
+	//if err != nil {
+	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+	//}
+	//if _, err := svc.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
+	//	GroupId: csgo.GroupId,
+	//	IpPermissions:[]*ec2.IpPermission{},
+	//}); err != nil {
+	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+	//}
+	//log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("completed")
 
 	// Run Instance in Forensic VPC
 	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
@@ -192,7 +193,7 @@ func HandleRequest(instanceId string) (string, error) {
 		},
 		MaxCount: aws.Int64(1),
 		MinCount: aws.Int64(1),
-		SecurityGroupIds: []*string{csgo.GroupId},
+		SecurityGroupIds: []*string{aws.String(forensicSgId)},
 		SubnetId: aws.String(forensicSubnetId),
 	}
 

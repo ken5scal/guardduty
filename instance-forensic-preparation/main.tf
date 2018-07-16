@@ -8,6 +8,10 @@ variable "clean_room_cidr" {
   default = "172.32.0.0/24"
 }
 
+variable "trusted_cidr" {
+  default = "119.106.15.81/32"
+}
+
 // TODO Single public subnet(ap-northeast-1a) vpc
 resource "aws_vpc" "clean_room_vpc" {
   count      = "${var.is_incident}"
@@ -24,8 +28,19 @@ resource "aws_security_group" "clean_room_sg" {
   vpc_id      = "${aws_vpc.clean_room_vpc.id}"
 
   // There will be no rule
-  // ingress {}
-  // egress {}
+  egress {
+    from_port = 0
+    protocol = "-1"
+    to_port = 0
+    cidr_blocks = []
+  }
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["${var.trusted_cidr}"]
+  }
 
   tags {
     Name = "CleanRoomSG"
