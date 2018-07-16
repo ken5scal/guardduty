@@ -31,27 +31,26 @@ var describeEc2AttributeInput = &ec2.DescribeInstanceAttributeInput{
 	Attribute: aws.String("blockDeviceMapping"),
 }
 
-var slackURL, forensicVpcId string
+var slackURL, forensicVpcId, forensicSubnetId string
 
 func init() {
 	slackURL = os.Getenv("SLACK_URL")
 	forensicVpcId = os.Getenv("FORENSIC_VPC_ID")
+	forensicSubnetId = os.Getenv("FORENSIC_SUBNET_ID")
 	zerolog.TimeFieldFormat = ""
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
 func main() {
-	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger() //.Output(zerolog.ConsoleWriter{Out: os.Stdout})
-
-	if slackURL == "" || forensicVpcId == "" {
-		log.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
+	if slackURL == "" || forensicVpcId == "" || forensicSubnetId == "" {
+		log.Fatal().Msg("you must set Env Var `SLACK_URL`, `FORENSIC_VPC_ID` and `FORENSIC_SUBNET_ID`")
 	}
-	//TODO Check existence of ForensicVPC
+	//TODO Check existence of ForensicVPC/ForensicSubnet
 	lambda.Start(HandleRequest)
 }
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
 func HandleRequest(instanceId string) (string, error) {
-	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout})
+	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger()//.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 
 	if instanceId == "" {
 		return "", errors.New("Empty InstanceId")
@@ -107,32 +106,48 @@ func HandleRequest(instanceId string) (string, error) {
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
-	// Create AMI
-	log.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("started")
-	ii := &ec2.ImportImageInput{
-		DiskContainers: []*ec2.ImageDiskContainer{
+	// Create EBS/AMI
+	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("started")
+	//ii := &ec2.ImportImageInput{
+	//	DiskContainers: []*ec2.ImageDiskContainer{
+	//		{
+	//			SnapshotId: snapShot.SnapshotId,
+	//		},
+	//	},
+	//}
+	cvi := &ec2.CreateVolumeInput{
+		//ToDO Dynamically retrieve from forensic_subnet-id
+		AvailabilityZone: aws.String("ap-northeast-1a"),
+		SnapshotId: snapShot.SnapshotId,
+		TagSpecifications: []*ec2.TagSpecification{
 			{
-				SnapshotId: snapShot.SnapshotId,
+				ResourceType: aws.String("instance"),
+				Tags: []*ec2.Tag{
+					{
+						Key: aws.String("Name"), Value:aws.String("forensic-ebs-volume"),
+					},
+				},
 			},
 		},
 	}
-	io, err := svc.ImportImage(ii)
+	cvo, err := svc.CreateVolume(cvi)
+	//io, err := svc.ImportImage(ii) // CreateImage
 	if err != nil {
-		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("failed")
 	}
 
 	// Check Status
-	var importStatus string
-	for importStatus != "completed"  {
-		do, err := svc.DescribeImportImageTasks(&ec2.DescribeImportImageTasksInput{
-			ImportTaskIds: []*string{io.ImportTaskId},
-		})
-		if err != nil {
-			log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
-		}
-		importStatus = *do.ImportImageTasks[0].Status
-	}
-	log.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("succeeded")
+	//var importStatus string
+	//for importStatus != "completed"  {
+	//	do, err := svc.DescribeVolumeta(&ec2.DescribeImportImageTasksInput{
+	//		ImportTaskIds: []*string{io.ImportTaskId},
+	//	})
+	//	if err != nil {
+	//		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+	//	}
+	//	importStatus = *do.ImportImageTasks[0].Status
+	//}
+	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("succeeded")
 
 	// Create Isolated Security Group
 	log.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
@@ -157,6 +172,7 @@ func HandleRequest(instanceId string) (string, error) {
 	ro := &ec2.RunInstancesInput{
 		TagSpecifications: []*ec2.TagSpecification{
 			{
+				ResourceType: aws.String("instance"),
 				Tags: []*ec2.Tag{
 					{
 						Key: aws.String("Name"), Value:aws.String("forensic-instance"),
@@ -164,15 +180,27 @@ func HandleRequest(instanceId string) (string, error) {
 				},
 			},
 		},
-		ImageId: io.ImageId,
 		MaxCount: aws.Int64(1),
 		MinCount: aws.Int64(1),
 		SecurityGroupIds: []*string{csgo.GroupId},
+		SubnetId: aws.String(forensicSubnetId),
 	}
-	if _, err = svc.RunInstances(ro); err != nil {
+
+	re, err := svc.RunInstances(ro)
+	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
+
+	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("started")
+	if _, err := svc.AttachVolume(&ec2.AttachVolumeInput{
+		InstanceId: re.Instances[0].InstanceId,
+		VolumeId: cvo.VolumeId,
+		Device: aws.String("/dev/sdf"), //TODO Change device name based on already running instance.
+	}); err != nil {
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("failed")
+	}
+	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("succeeded")
 
 	return fmt.Sprintf("Created Snapshot %s!", snapShot.SnapshotId), nil
 }

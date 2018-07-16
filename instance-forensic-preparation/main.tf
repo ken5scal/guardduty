@@ -8,6 +8,7 @@ variable "clean_room_cidr" {
   default = "172.32.0.0/24"
 }
 
+// TODO Single public subnet(ap-northeast-1a) vpc
 resource "aws_vpc" "clean_room_vpc" {
   count      = "${var.is_incident}"
   cidr_block = "${var.clean_room_cidr}"
