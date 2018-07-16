@@ -169,7 +169,7 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err error) {
 	input := &ec2.CreateVolumeInput{
 		//ToDO Dynamically retrieve AZ from subnet-id
-		AvailabilityZone: aws.String("ap-northeast-1d"),
+		AvailabilityZone: aws.String("ap-northeast-1a"),
 		SnapshotId:       aws.String(snapshotId),
 		TagSpecifications: []*ec2.TagSpecification{
 			{

@@ -197,25 +197,48 @@ resource "aws_iam_role_policy_attachment" "basic_lambda" {
 }
 
 resource "aws_lambda_function" "forensic_lambda" {
-  function_name = "forensic-lambda"
-  filename = "main.zip"
-  handler       = "main"
-  role          = "${aws_iam_role.forensic_lambda_role.arn}"
-  runtime       = "go1.x"
-  timeout = 300
+  filename         = "main.zip"
+  function_name    = "forensic-lambda"
+  role             = "${aws_iam_role.forensic_lambda_role.arn}"
+  handler          = "main"
+  source_code_hash = "${base64sha256(file("main.zip"))}"
+  runtime          = "go1.x"
+  timeout          = 300
 
   environment {
     variables {
-      FORENSIC_SG_ID = "${aws_security_group.forensic_isolated_sg.id}"
+      FORENSIC_SG_ID     = "${aws_security_group.forensic_isolated_sg.id}"
       FORENSIC_SUBNET_ID = "${aws_subnet.forensic_private_subnet.id}"
-      FORENSIC_VPC_ID = "${aws_vpc.forensic_vpc.id}"
-      SLACK_URL = "${var.slack_url}"
+      FORENSIC_VPC_ID    = "${aws_vpc.forensic_vpc.id}"
+      SLACK_URL          = "${var.slack_url}"
     }
   }
 }
 
+//resource "aws_lambda_alias" "forensic_lambda" {
+//  name             = "forensic_lambda_alias"
+//  description      = "forensic lambda alias"
+//  function_name    = "${aws_lambda_function.forensic_lambda.function_name}"
+//  function_version = "$LATEST"
+//}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.forensic_lambda.function_name}"
+  principal     = "events.amazonaws.com"
+  source_arn    = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.arn}"
+
+  //  qualifier     = "${aws_lambda_alias.forensic_lambda.name}"
+}
+
 resource "aws_cloudwatch_event_rule" "send_all_guardduty_events_rule" {
   name = "RuleToSendAllGuardDutyEvents"
+
+  depends_on = [
+    "aws_lambda_function.forensic_lambda",
+  ]
+
   event_pattern = <<EOF
 {
   "detail-type": [
@@ -229,16 +252,9 @@ EOF
 }
 
 resource "aws_cloudwatch_event_target" "guardduty-lambda" {
-  rule = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.name}"
-  arn = "${aws_lambda_function.forensic_lambda.arn}"
-}
-
-resource "aws_lambda_permission" "allow_cloudwatch" {
-  statement_id   = "AllowExecutionFromCloudWatch"
-  action         = "lambda:InvokeFunction"
-  function_name  = "${aws_lambda_function.forensic_lambda.function_name}"
-  principal      = "events.amazonaws.com"
-  source_arn = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.arn}"
+  target_id = "forensic_lambda"
+  rule      = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.name}"
+  arn       = "${aws_lambda_function.forensic_lambda.arn}"
 }
 
 resource "aws_vpc" "forensic_vpc" {
@@ -250,8 +266,8 @@ resource "aws_vpc" "forensic_vpc" {
 }
 
 resource "aws_subnet" "forensic_private_subnet" {
-  cidr_block = "${var.forensic_vpc_cidr}"
-  vpc_id     = "${aws_vpc.forensic_vpc.id}"
+  cidr_block        = "${var.forensic_vpc_cidr}"
+  vpc_id            = "${aws_vpc.forensic_vpc.id}"
   availability_zone = "ap-northeast-1a"
 
   tags {
@@ -277,4 +293,3 @@ resource "aws_security_group" "forensic_isolated_sg" {
     Name = "Forensic-Isolated-Sg"
   }
 }
-
