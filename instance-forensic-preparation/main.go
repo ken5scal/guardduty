@@ -36,7 +36,7 @@ var slackURL, forensicVpcId string
 
 func init() {
 	slackURL = os.Getenv("SLACK_URL")
-	forensicVpcId = os.Getenv("FORENSIC_VPC")
+	forensicVpcId = os.Getenv("FORENSIC_VPC_ID")
 	zerolog.TimeFieldFormat = ""
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
@@ -45,6 +45,7 @@ func main() {
 	if slackURL == "" || forensicVpcId == "" {
 		logger.Fatal().Msg("you must set Env Var `SLACK_URL` and `FORENSIC_URL`")
 	}
+	//TODO Check existence of ForensicVPC
 	lambda.Start(HandleRequest)
 }
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
@@ -137,8 +138,25 @@ func HandleRequest(instanceId string) (string, error) {
 	}
 	logger.Info().Str("duration", returnDuration()).Str("status", "create an AMI").Msg("succeeded")
 
-	// TODO Run Instance in Forensic VPC
-	//svc.createSecurityGroup
+	// Create Isolated Security Group
+	logger.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("succeeded")
+	csgi := &ec2.CreateSecurityGroupInput{
+		VpcId: aws.String(forensicVpcId),
+		GroupName: aws.String("forensic-isolation-sg"),
+	}
+	csgo, err := svc.CreateSecurityGroup(csgi)
+	if err != nil {
+		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+	}
+	if _, err := svc.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
+		GroupId: csgo.GroupId,
+		IpPermissions:[]*ec2.IpPermission{},
+	}); err != nil {
+		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create a SG").Msg("failed")
+	}
+	logger.Info().Str("duration", returnDuration()).Str("status", "create a SG").Msg("completed")
+
+	// Run Instance in Forensic VPC
 	logger.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
 	ro := &ec2.RunInstancesInput{
 		TagSpecifications: []*ec2.TagSpecification{
@@ -153,6 +171,7 @@ func HandleRequest(instanceId string) (string, error) {
 		ImageId: io.ImageId,
 		MaxCount: aws.Int64(1),
 		MinCount: aws.Int64(1),
+		SecurityGroupIds: []*string{csgo.GroupId},
 	}
 	if _, err = svc.RunInstances(ro); err != nil {
 		logger.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
