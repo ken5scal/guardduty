@@ -104,6 +104,16 @@ func HandleRequest(instanceId string) (string, error) {
 	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 	}
+	// Check State
+	var snapShotState string
+	for snapShotState != "completed"  {
+		dso, err := svc.DescribeSnapshots(
+			&ec2.DescribeSnapshotsInput{SnapshotIds: []*string{snapShot.SnapshotId}})
+		if err != nil {
+			log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
+		}
+		snapShotState = *dso.Snapshots[0].State
+	}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
 	// Create EBS/AMI
@@ -121,7 +131,7 @@ func HandleRequest(instanceId string) (string, error) {
 		SnapshotId: snapShot.SnapshotId,
 		TagSpecifications: []*ec2.TagSpecification{
 			{
-				ResourceType: aws.String("instance"),
+				ResourceType: aws.String("volume"),
 				Tags: []*ec2.Tag{
 					{
 						Key: aws.String("Name"), Value:aws.String("forensic-ebs-volume"),
