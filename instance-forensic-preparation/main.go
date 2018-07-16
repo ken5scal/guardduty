@@ -12,8 +12,6 @@ import (
 	"os"
 )
 
-var timeout = time.Duration(5 * time.Minute)
-
 var slackURL, forensicVpcId, forensicSubnetId, forensicSgId string
 
 func init() {
@@ -33,6 +31,7 @@ func main() {
 	}
 	lambda.Start(HandleRequest)
 }
+
 //func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
 func HandleRequest(instanceId string) (error) {
 	log.Logger = zerolog.New(os.Stdout).With().Caller().Logger()
@@ -49,148 +48,42 @@ func HandleRequest(instanceId string) (error) {
 		InstanceId: instanceId,
 	}
 
-	//awsInstanceId := []*string{aws.String(instanceId)}
-	//stopInstancesInput.InstanceIds = awsInstanceId
-	//describeInstancesInput.InstanceIds = awsInstanceId
-	//describeEc2AttributeInput.InstanceId = aws.String(instanceId)
-
-	//s := session.Must(session.NewSession())
-	//svc := ec2.New(s)
-
-	// Stop Instance
+	// Stop Instance (Immediately, because it is suspected to be infected)
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
-	forensic.StopInstance()
+	if err := forensic.StopInstance(); err != nil {
+		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stop instance").Msg("failed")
+	}
 	log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
 
-
-	//log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("started")
-	//if _, err := svc.StopInstances(stopInstancesInput); err != nil {
-	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
-	//} else {
-	//	if err := svc.WaitUntilInstanceStopped(describeInstancesInput); err != nil {
-	//		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "stopping instance").Msg("failed")
-	//	}
-	//}
-	//log.Info().Str("duration", returnDuration()).Str("status", "stop instance").Msg("succeeded")
-
-	// Describe Instance
-	//log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("started")
-	//out, err := svc.DescribeInstanceAttribute(describeEc2AttributeInput)
-	//if err != nil {
-	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "describe instance").Msg("failed")
-	//}
-	//log.Info().Str("duration", returnDuration()).Str("status", "describe instance").Msg("succeeded")
-
-	/*
-	//  Create a Snapshot
-	 */
-	// assuming there is only one volume
-	//createSnapshotInput.VolumeId = out.BlockDeviceMappings[0].Ebs.VolumeId
-	//createSnapshotInput.TagSpecifications = []*ec2.TagSpecification{
-	//	{
-	//		ResourceType: aws.String("snapshot"),
-	//		Tags: []*ec2.Tag{{Key: aws.String("Name"), Value:aws.String("forensic-snapshot")}},
-	//	},
-	//}
+	// Create a snapshot for an evidence
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("started")
-	snapShotId, err := forensic.TakeSnapshot()
+	snapShotId, err := forensic.CreateEvidenceSnapshot()
 	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
 	}
-	//snapShot, err := svc.CreateSnapshotWithContext(ctx, createSnapshotInput)
-	//if err != nil {
-	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("failed")
-	//}
-	//// Check State
-	//var snapShotState string
-	//for snapShotState != "completed"  {
-	//	dso, err := svc.DescribeSnapshots(
-	//		&ec2.DescribeSnapshotsInput{SnapshotIds: []*string{snapShot.SnapshotId}})
-	//	if err != nil {
-	//		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an AMI").Msg("failed")
-	//	}
-	//	snapShotState = *dso.Snapshots[0].State
-	//}
 	log.Info().Str("duration", returnDuration()).Str("status", "taking snapshot").Msg("succeeded")
 
-	// Create EBS
+	// Create EBS from snapshot
 	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("started")
-	volumeId, err := forensic.CreateBackupEBS(snapShotId)
-	//cvi := &ec2.CreateVolumeInput{
-	//	//ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
-	//	AvailabilityZone: aws.String("ap-northeast-1d"),
-	//	SnapshotId: snapShot.SnapshotId,
-	//	TagSpecifications: []*ec2.TagSpecification{
-	//		{
-	//			ResourceType: aws.String("volume"),
-	//			Tags: []*ec2.Tag{
-	//				{
-	//					Key: aws.String("Name"), Value:aws.String("forensic-ebs-volume"),
-	//				},
-	//			},
-	//		},
-	//	},
-	//}
-	//cvo, err := svc.CreateVolume(cvi)
+	volumeId, err := forensic.CreateEvidenceEBS(snapShotId)
 	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("failed")
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "create an EBS volume").Msg("succeeded")
 
-	// Run Instance in Forensic VPC
+	// Start up a forensic workstation
 	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("started")
-	//ro := &ec2.RunInstancesInput{
-	//	TagSpecifications: []*ec2.TagSpecification{
-	//		{
-	//			ResourceType: aws.String("instance"),
-	//			Tags: []*ec2.Tag{
-	//				{
-	//					Key: aws.String("Name"), Value:aws.String("forensic-instance"),
-	//				},
-	//			},
-	//		},
-	//	},
-	//	MaxCount: aws.Int64(1),
-	//	MinCount: aws.Int64(1),
-	//	SecurityGroupIds: []*string{aws.String(forensicSgId)},
-	//	SubnetId: aws.String(forensicSubnetId),
-	//	InstanceType: aws.String("t2.micro"), //TODO put into config // maybe t2.large is better according to https://www.sans.org/reading-room/whitepapers/cloud/digital-forensic-analysis-amazon-linux-ec2-instances-38235?
-	//	ImageId: aws.String("ami-e99f4896"), //ToDo Add User Data or make it the latest
-	//}
-	//
-	//re, err := svc.RunInstances(ro)
-	//if err != nil {
-	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
-	//}
-	//
-	//var isRunning bool
-	//for !isRunning {
-	//	diso, err := svc.DescribeInstanceStatus(&ec2.DescribeInstanceStatusInput{
-	//		InstanceIds:[]*string{re.Instances[0].InstanceId},
-	//		IncludeAllInstances: aws.Bool(true),
-	//	})
-	//	if err != nil {
-	//		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
-	//	}
-	//	isRunning = (*diso.InstanceStatuses[0].InstanceState.Name == "running")
-	//}
 	workstationId, err := forensic.StartForensicWorkstation()
 	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
 	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
 
+	// Attach Evidence EBS to Workstation
 	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("started")
 	if err := forensic.AttachEvidenceToWorkstation(workstationId, volumeId); err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("failed")
 	}
-	//if _, err := svc.AttachVolume(&ec2.AttachVolumeInput{
-	//	InstanceId: re.Instances[0].InstanceId,
-	//	VolumeId: cvo.VolumeId,
-	//	Device: aws.String("/dev/sdf"), //TODO Change device name based on already running instance.
-	//}); err != nil {
-	//	log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("failed")
-	//}
 	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("succeeded")
 
 	return nil
@@ -207,6 +100,7 @@ type EC2Forensic struct {
 // StopInstance stops running instance.
 // TODO Check status of instance first: exists? just stopped?
 func (e *EC2Forensic) StopInstance() error {
+	log.Info().Str("tagetInstanceId", e.InstanceId)
 	var stopInstancesInput = &ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
 		InstanceIds: []*string{aws.String(e.InstanceId)},
@@ -225,8 +119,8 @@ func (e *EC2Forensic) StopInstance() error {
 	return nil
 }
 
-// Take SnapShot of EC2 instance
-func (e *EC2Forensic) TakeSnapshot() (snapshotId string, err error) {
+// Take SnapShot of suspected EC2 instance for taking evidence
+func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 	describeEc2AttributeInput := &ec2.DescribeInstanceAttributeInput{
 		Attribute: aws.String("blockDeviceMapping"),
 		InstanceId: aws.String(e.InstanceId),
@@ -266,7 +160,7 @@ func (e *EC2Forensic) TakeSnapshot() (snapshotId string, err error) {
 	return *snapShot.SnapshotId, nil
 }
 
-func (e *EC2Forensic) CreateBackupEBS(snapshotId string) (volumeId string, err error) {
+func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err error) {
 	input := &ec2.CreateVolumeInput{
 		AvailabilityZone: aws.String("ap-northeast-1d"), //ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
 		SnapshotId: aws.String(snapshotId),
