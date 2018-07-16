@@ -127,8 +127,8 @@ func HandleRequest(instanceId string) (string, error) {
 	//	},
 	//}
 	cvi := &ec2.CreateVolumeInput{
-		//ToDO Dynamically retrieve from forensic_subnet-id
-		AvailabilityZone: aws.String("ap-northeast-1a"),
+		//ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
+		AvailabilityZone: aws.String("ap-northeast-1d"),
 		SnapshotId: snapShot.SnapshotId,
 		TagSpecifications: []*ec2.TagSpecification{
 			{
@@ -203,6 +203,19 @@ func HandleRequest(instanceId string) (string, error) {
 	if err != nil {
 		log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
 	}
+
+	var isRunning bool
+	for !isRunning {
+		diso, err := svc.DescribeInstanceStatus(&ec2.DescribeInstanceStatusInput{
+			InstanceIds:[]*string{re.Instances[0].InstanceId},
+			IncludeAllInstances: aws.Bool(true),
+		})
+		if err != nil {
+			log.Fatal().Err(err).Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("failed")
+		}
+		isRunning = (*diso.InstanceStatuses[0].InstanceState.Name == "running")
+	}
+
 	log.Info().Str("duration", returnDuration()).Str("status", "Starting up a forensic instance").Msg("succeeded")
 
 	log.Info().Str("duration", returnDuration()).Str("status", "Attaching Volume").Msg("started")
