@@ -1,16 +1,16 @@
-variable "snapshot_id" {}
-
-variable "is_incident" {
-  default = 0
+provider "aws" {
+  region = "ap-northeast-1"
 }
 
-variable "account_id" {
+variable "account_id" {}
+variable "slack_url" {}
+
+variable "region" {
   default = "ap-northeast-1"
 }
-variable "region" {}
 
-variable "clean_room_cidr" {
-  default = "172.32.0.0/24"
+variable "forensic_vpc_cidr" {
+  default = "172.32.0.0/28"
 }
 
 variable "trusted_cidr" {
@@ -19,6 +19,7 @@ variable "trusted_cidr" {
 
 resource "aws_iam_role" "forensic_lambda_role" {
   name = "forensic_role_for_lambda"
+
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -36,8 +37,9 @@ EOF
 }
 
 resource "aws_iam_policy" "forensic_lambda_policy" {
-  name = "forensic-policy"
+  name        = "forensic-policy"
   description = "Policy required for forensic"
+
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -146,90 +148,133 @@ resource "aws_iam_policy" "forensic_lambda_policy" {
             "ec2:CreateVolume"
         ],
         "Resource": "*"
-    },
+    }
   ]
 }
 EOF
 }
 
 resource "aws_iam_policy" "basic_lambda_policy" {
-  name = "basic-lambda-policy"
+  name        = "basic-lambda-policy"
   description = "Policy required for basic lambda functionality"
+
   policy = <<EOF
 {
-    "Sid": "VisualEditor1",
-    "Effect": "Allow",
-    "Action": [
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-    ],
-    "Resource": "arn:aws:logs:${var.region}:${var.account_id}:log-group:${aws_cloudwatch_log_group.forensic_lambda_log_group.name}:*"
-},
-{
-    "Sid": "VisualEditor2",
-    "Effect": "Allow",
-    "Action": "logs:CreateLogGroup",
-    "Resource": "arn:aws:logs:${var.region}:${var.account_id}:*"
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:${var.region}:${var.account_id}:log-group:${aws_cloudwatch_log_group.forensic_lambda_log_group.name}:*"
+    },
+    {
+      "Sid": "VisualEditor2",
+      "Effect": "Allow",
+      "Action": "logs:CreateLogGroup",
+      "Resource": "arn:aws:logs:${var.region}:${var.account_id}:*"
+    }
+  ]
 }
 EOF
 }
 
 resource "aws_cloudwatch_log_group" "forensic_lambda_log_group" {
-  name = "/aws/lambda/take-forensic-snapshot"
+  name = "/aws/lambda/forensic-lambda"
 }
 
 resource "aws_iam_role_policy_attachment" "forensic_lambda" {
-  role = "${aws_iam_role.forensic_lambda_role.name}"
+  role       = "${aws_iam_role.forensic_lambda_role.name}"
   policy_arn = "${aws_iam_policy.forensic_lambda_policy.arn}"
 }
 
 resource "aws_iam_role_policy_attachment" "basic_lambda" {
-  role = "${aws_iam_role.forensic_lambda_role.name}"
+  role       = "${aws_iam_role.forensic_lambda_role.name}"
   policy_arn = "${aws_iam_policy.basic_lambda_policy.arn}"
 }
 
-// TODO Single public subnet(ap-northeast-1a) vpc
-resource "aws_vpc" "clean_room_vpc" {
-  count      = "${var.is_incident}"
-  cidr_block = "${var.clean_room_cidr}"
+resource "aws_lambda_function" "forensic_lambda" {
+  function_name = "forensic-lambda"
+  filename = "main.zip"
+  handler       = "main"
+  role          = "${aws_iam_role.forensic_lambda_role.arn}"
+  runtime       = "go1.x"
+  timeout = 300
 
-  tags {
-    Name = "CleanRoomVPC"
+  environment {
+    variables {
+      FORENSIC_SG_ID = "${aws_security_group.forensic_isolated_sg.id}"
+      FORENSIC_SUBNET_ID = "${aws_subnet.forensic_private_subnet.id}"
+      FORENSIC_VPC_ID = "${aws_vpc.forensic_vpc.id}"
+      SLACK_URL = "${var.slack_url}"
+    }
   }
 }
 
-resource "aws_security_group" "clean_room_sg" {
-  name        = "forensic_sg"
-  description = "Allow no rule. Just your IP or bastion IP"
-  vpc_id      = "${aws_vpc.clean_room_vpc.id}"
+resource "aws_cloudwatch_event_rule" "send_all_guardduty_events_rule" {
+  name = "RuleToSendAllGuardDutyEvents"
+  event_pattern = <<EOF
+{
+  "detail-type": [
+    "GuardDuty Finding"
+  ],
+  "source": [
+    "aws.guardduty"
+  ]
+}
+EOF
+}
 
-  // There will be no rule
-  egress {
-    from_port = 0
-    protocol = "-1"
-    to_port = 0
-    cidr_blocks = []
+resource "aws_cloudwatch_event_target" "guardduty-lambda" {
+  rule = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.name}"
+  arn = "${aws_lambda_function.forensic_lambda.arn}"
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  statement_id   = "AllowExecutionFromCloudWatch"
+  action         = "lambda:InvokeFunction"
+  function_name  = "${aws_lambda_function.forensic_lambda.function_name}"
+  principal      = "events.amazonaws.com"
+  source_arn = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.arn}"
+}
+
+resource "aws_vpc" "forensic_vpc" {
+  cidr_block = "${var.forensic_vpc_cidr}"
+
+  tags {
+    Name = "Forensic-Vpc"
   }
+}
+
+resource "aws_subnet" "forensic_private_subnet" {
+  cidr_block = "${var.forensic_vpc_cidr}"
+  vpc_id     = "${aws_vpc.forensic_vpc.id}"
+  availability_zone = "ap-northeast-1a"
+
+  tags {
+    Name = "Forensic-Private-Subnet"
+  }
+}
+
+resource "aws_security_group" "forensic_isolated_sg" {
+  name        = "forensic_isolated_sg"
+  description = "Allow no rule. Just your IP or bastion IP"
+  vpc_id      = "${aws_vpc.forensic_vpc.id}"
+
+  egress = []
 
   ingress {
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
     cidr_blocks = ["${var.trusted_cidr}"]
   }
 
   tags {
-    Name = "CleanRoomSG"
+    Name = "Forensic-Isolated-Sg"
   }
 }
 
-resource "aws_ami" "investigated_ami" {
-  name             = "investigated_ami"
-  root_snapshot_id = "${var.snapshot_id}"
-}
-
-resource "aws_instance" "investifate" {
-  ami                    = "${aws_ami.investigated_ami}"
-  instance_type          = "t2.small"
-  vpc_security_group_ids = ["${aws_security_group.clean_room_sg.id}"]
-}
