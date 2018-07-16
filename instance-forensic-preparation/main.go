@@ -28,7 +28,6 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
-//TODO Check existence of ForensicVPC/ForensicSubnet
 //TODO Add Date
 func main() {
 	if slackURL == "" || forensicVpcId == "" || forensicSubnetId == "" || forensicSgId == "" {
@@ -107,7 +106,6 @@ type EC2Forensic struct {
 }
 
 // StopInstance stops running instance.
-// TODO Check status of instance first: exists? just stopped?
 func (e *EC2Forensic) StopInstance() error {
 	var stopInstancesInput = &ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
@@ -170,7 +168,7 @@ func (e *EC2Forensic) CreateEvidenceSnapshot() (snapshotId string, err error) {
 
 func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err error) {
 	input := &ec2.CreateVolumeInput{
-		//ToDO Dynamically retrieve from forensic_subnet-id, config, or whatever
+		//ToDO Dynamically retrieve AZ from subnet-id
 		AvailabilityZone: aws.String("ap-northeast-1d"),
 		SnapshotId:       aws.String(snapshotId),
 		TagSpecifications: []*ec2.TagSpecification{
@@ -200,7 +198,7 @@ func (e *EC2Forensic) CreateEvidenceEBS(snapshotId string) (volumeId string, err
 	return *output.VolumeId, nil
 }
 
-//ToDo Add User Data and make it the latest
+//TODO
 func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err error) {
 	input := &ec2.RunInstancesInput{
 		TagSpecifications: []*ec2.TagSpecification{
@@ -244,7 +242,6 @@ func (e *EC2Forensic) StartForensicWorkstation() (workstationId string, err erro
 	return *output.Instances[0].InstanceId, nil
 }
 
-// TODO check if /dev/sdf is not taken
 func (e *EC2Forensic) AttachEvidenceToWorkstation(workstationId, evidenceVolumeId string) (err error) {
 	_, err = e.svc.AttachVolume(&ec2.AttachVolumeInput{
 		InstanceId: aws.String(workstationId),
