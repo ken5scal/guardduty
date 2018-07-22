@@ -37,7 +37,7 @@ func HandleRequest(request CloudWatchEventForGuardDuty) {
 }
 
 func postOnSlack(request CloudWatchEventForGuardDuty) error {
-	severity, err := mapSeverityToLevel(request)
+	severity, err := initializeSeverity(request.Detail.Severity)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func postOnSlack(request CloudWatchEventForGuardDuty) error {
 			},
 			{
 				Title: "Account",
-				Value: severity.AccountAlias,
+				Value: request.Detail.AccountID,
 				Short: true,
 			},
 			{
@@ -87,16 +87,13 @@ func postOnSlack(request CloudWatchEventForGuardDuty) error {
 }
 
 type Severity struct {
-	AccountAlias string
 	Level        string
 	Color        string
 	Announce     bool
 }
 
-func mapSeverityToLevel(request CloudWatchEventForGuardDuty) (*Severity, error) {
-	severity := request.Detail.Severity
+func initializeSeverity(severity float64) (*Severity, error) {
 	s := &Severity{}
-	s.AccountAlias = request.Detail.AccountID
 
 	if 0 <= severity && severity < 4 {
 		s.Level = "Low"
