@@ -9,6 +9,7 @@ import (
 	"github.com/nlopes/slack"
 	"net/http"
 	"os"
+	"github.com/rs/zerolog/log"
 )
 
 var ErrNameNotProvided = errors.New("no name was provided in the HTTP body")
@@ -23,18 +24,16 @@ func init() {
 //https://aws.amazon.com/blogs/compute/announcing-go-support-for-aws-lambda/
 func main() {
 	lambda.Start(HandleRequest)
-	fmt.Println("test check")
 }
 
-func HandleRequest(request CloudWatchEventForGuardDuty) (string, error) {
+func HandleRequest(request CloudWatchEventForGuardDuty) {
 	if slackURL == "" {
-		return "", errors.New("you must set Env Var `SLACK_URL`")
+		log.Fatal().Msg("you must set Env Var `SLACK_URL`")
 	}
 
 	if err := postOnSlack(request); err != nil {
-		return "", err
+		log.Fatal().Err(err).Msg("failed.")
 	}
-	return fmt.Sprintf("Hello %s!", "hogefuga"), nil
 }
 
 func postOnSlack(request CloudWatchEventForGuardDuty) error {
@@ -98,10 +97,6 @@ func mapSeverityToLevel(request CloudWatchEventForGuardDuty) (*Severity, error) 
 	severity := request.Detail.Severity
 	s := &Severity{}
 	s.AccountAlias = request.Detail.AccountID
-
-	if request.Detail_type == "Recon:EC2/PortProbeUnprotectedPort" {
-		fmt.Println(request.Detail.Service.Count)
-	}
 
 	if 0 <= severity && severity < 4 {
 		s.Level = "Low"
