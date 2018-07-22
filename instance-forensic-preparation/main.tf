@@ -215,21 +215,12 @@ resource "aws_lambda_function" "forensic_lambda" {
   }
 }
 
-//resource "aws_lambda_alias" "forensic_lambda" {
-//  name             = "forensic_lambda_alias"
-//  description      = "forensic lambda alias"
-//  function_name    = "${aws_lambda_function.forensic_lambda.function_name}"
-//  function_version = "$LATEST"
-//}
-
 resource "aws_lambda_permission" "allow_cloudwatch" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = "${aws_lambda_function.forensic_lambda.function_name}"
   principal     = "events.amazonaws.com"
   source_arn    = "${aws_cloudwatch_event_rule.send_all_guardduty_events_rule.arn}"
-
-  //  qualifier     = "${aws_lambda_alias.forensic_lambda.name}"
 }
 
 resource "aws_cloudwatch_event_rule" "send_all_guardduty_events_rule" {
