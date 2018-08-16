@@ -8,7 +8,7 @@ variable "aws-regions" {
     oregon     = "us-west-2"
     tokyo      = "ap-northeast-1"
     seoul      = "ap-northeast-2"
-    osaka      = "ap-northeast-3"
+    osaka      = "ap-northeast-3" // Just a local region
     mumbai     = "ap-south-1"
     singapore  = "ap-southeast-1"
     sydney     = "ap-southeast-2"
