@@ -1,48 +1,122 @@
 provider "aws" {
-  region = "ap-northeast-1"
+  alias  = "master-tokyo"
+  region = "${var.aws-regions["tokyo"]}"
 }
 
 provider "aws" {
-  alias   = "member"
+  alias  = "master-virginia"
+  region = "${var.aws-regions["virginia"]}"
+}
+
+provider "aws" {
+  alias  = "master-ohio"
+  region = "${var.aws-regions["ohio"]}"
+}
+
+provider "aws" {
+  alias  = "master-california"
+  region = "${var.aws-regions["california"]}"
+}
+
+provider "aws" {
+  alias  = "master-oregon"
+  region = "${var.aws-regions["oregon"]}"
+}
+
+provider "aws" {
+  alias  = "master-seou"
+  region = "${var.aws-regions["seoul"]}"
+}
+
+provider "aws" {
+  alias  = "master-osaka"
+  region = "${var.aws-regions["osaka"]}"
+}
+
+provider "aws" {
+  alias  = "master-mumbai"
+  region = "${var.aws-regions["mumbai"]}"
+}
+
+provider "aws" {
+  alias  = "master-singapore"
+  region = "${var.aws-regions["singapore"]}"
+}
+
+provider "aws" {
+  alias  = "master-sydney"
+  region = "${var.aws-regions["sydney"]}"
+}
+
+provider "aws" {
+  alias  = "master-canada"
+  region = "${var.aws-regions["canada"]}"
+}
+
+provider "aws" {
+  alias  = "master-beijing"
+  region = "${var.aws-regions["beijing"]}"
+}
+
+provider "aws" {
+  alias  = "master-ningxia"
+  region = "${var.aws-regions["ningxia"]}"
+}
+
+provider "aws" {
+  alias  = "master-frankfurt"
+  region = "${var.aws-regions["frankfurt"]}"
+}
+
+provider "aws" {
+  alias  = "master-ireland"
+  region = "${var.aws-regions["ireland"]}"
+}
+
+provider "aws" {
+  alias  = "master-london"
+  region = "${var.aws-regions["london"]}"
+}
+
+provider "aws" {
+  alias  = "master-paris"
+  region = "${var.aws-regions["paris"]}"
+}
+
+provider "aws" {
+  alias  = "master-sao-paulo"
+  region = "${var.aws-regions["sao-paulo"]}"
+}
+
+provider "aws" {
+  alias   = "member001-tokyo"
   region  = "ap-northeast-1"
   profile = "sub"
 }
 
-//resource "aws_guardduty_detector" "master" {
-//  enable = true
-//}
-//
-//resource "aws_guardduty_detector" "member" {
-//  provider = "aws.member"
-//  enable = true
-//}
+// Tokyo Region GD
+resource "aws_guardduty_detector" "master-tokyo" {
+  provider = "aws.master-tokyo"
+  enable   = true
+}
+
+resource "aws_guardduty_detector" "member001-tokyo" {
+  provider = "aws.member001-tokyo"
+  enable   = true
+}
+
+// Virginia Region GD
+resource "aws_guardduty_detector" "master-virginia" {
+  provider = "aws.master-virginia"
+  enable   = true
+}
+
 //
 //resource "aws_guardduty_member" "member" {
 //  account_id = "${aws_guardduty_detector.member.account_id}"
-//  detector_id = "${aws_guardduty_detector.master.id}"
+//  detector_id = "${aws_guardduty_detector.master.id}"terraform import aws_guardduty_detector.MyDetector
 //  email = "kengoscal+001@gmail.com"
 //  invite = true
 //  invitation_message = "hogefugater"
 //}
 
-resource "aws_instance" "web" {
-  ami           = "${data.aws_ami.ubuntu.id}"
-  instance_type = "t2.micro"
-
-  tags {
-    Name = "HelloWorld"
-  }
-}
-
-resource "aws_iam_policy" "example" {
-  name   = "example_policy"
-  path   = "/"
-  policy = "${data.aws_iam_policy_document.example.json}"
-}
-
-data "aws_iam_policy_document" "example" {
-  statement {
-    actions   = ["s3:ListAllMyBuckets"]
-    resources = ["arn:aws:s3:::*"]
-  }
-}
